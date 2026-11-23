@@ -1,0 +1,19 @@
+{
+  "name": "devos",
+  "version": "1.0.0",
+  "description": "DevOS MCP integration for Factory Droid",
+  "tools": [
+    "get_project_brief",
+    "env_control",
+    "sync_project_assets",
+    "update_board_card",
+    "submit_for_testing",
+    "list_issues",
+    "resolve_issue",
+    "request_user_decision"
+  ],
+  "mcp": {
+    "command": "devos-mcp",
+    "args": []
+  }
+}

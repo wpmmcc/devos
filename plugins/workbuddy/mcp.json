@@ -1,0 +1,9 @@
+{
+  "name": "devos",
+  "version": "1.0.0",
+  "protocol": "mcp-stdio",
+  "command": "devos-mcp",
+  "args": [],
+  "auto_connect": true,
+  "description": "WorkBuddy 本地 DevOS 工作台连接器"
+}

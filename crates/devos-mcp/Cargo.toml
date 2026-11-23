@@ -1,0 +1,22 @@
+[package]
+name = "devos-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "devos-mcp"
+path = "src/main.rs"
+
+[dependencies]
+devos-schema = { workspace = true }
+devos-core = { workspace = true }
+devos-env = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

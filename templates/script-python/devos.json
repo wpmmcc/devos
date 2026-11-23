@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "project_id": "proj_template_script",
+  "slug": "script-starter",
+  "name": "Python 自动化脚本脚手架",
+  "description": "基于 Dev Container 的后端脚本、数据处理与自动化工具沙盒",
+  "project_type": "script",
+  "mode": "DEV_LOCAL",
+  "created_at": "2026-11-23T06:00:00Z",
+  "environments": {
+    "script": {
+      "enabled": true,
+      "driver": "devcontainer",
+      "config_dir": ".devcontainer",
+      "service_name": "app",
+      "workdir": "/workspace",
+      "non_root_user": "vscode",
+      "run_manifest": "devos.run.json"
+    }
+  },
+  "workspace_paths": {
+    "requirements": "requirements/",
+    "standards": "standards/",
+    "board": "board/",
+    "issues": "issues/",
+    "docs": "docs/",
+    "knowledge": "knowledge/",
+    "artifacts": ".devos/artifacts/"
+  },
+  "guardrails": {
+    "allow_destructive_in_modes": ["DEV_LOCAL"],
+    "require_smoke_check_before_testing": true,
+    "protected_paths": [".env"]
+  }
+}

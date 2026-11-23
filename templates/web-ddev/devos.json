@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "project_id": "proj_template_web",
+  "slug": "web-starter",
+  "name": "Web 应用标准脚手架",
+  "description": "基于 DDEV 的 Web 站点与数据库标准沙盒环境",
+  "project_type": "web",
+  "mode": "DEV_LOCAL",
+  "created_at": "2026-11-23T06:00:00Z",
+  "environments": {
+    "web": {
+      "enabled": true,
+      "driver": "ddev",
+      "config_dir": ".ddev",
+      "primary_url": "https://web-starter.ddev.site",
+      "health_check": {
+        "url": "https://web-starter.ddev.site/health",
+        "expect_status": 200,
+        "timeout_sec": 10
+      },
+      "snapshot_supported": true
+    }
+  },
+  "workspace_paths": {
+    "requirements": "requirements/",
+    "standards": "standards/",
+    "board": "board/",
+    "issues": "issues/",
+    "docs": "docs/",
+    "knowledge": "knowledge/",
+    "artifacts": ".devos/artifacts/"
+  },
+  "guardrails": {
+    "allow_destructive_in_modes": ["DEV_LOCAL"],
+    "require_smoke_check_before_testing": true,
+    "protected_paths": [".env", ".ddev/config.yaml"]
+  }
+}

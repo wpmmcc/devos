@@ -1,0 +1,20 @@
+{
+  "name": "devos-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DevOS: AI Agent Workbench & Standardized Local Environment Controller",
+  "scripts": {
+    "dev": "pnpm --filter devos-desktop dev",
+    "build": "pnpm --filter devos-desktop build",
+    "tauri": "tauri",
+    "tauri:dev": "pnpm --filter devos-desktop tauri:dev",
+    "tauri:build": "pnpm --filter devos-desktop tauri:build",
+    "export:types": "cargo test -p devos-schema export_bindings",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.2"
+  }
+}

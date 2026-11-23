@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "targets": [
+    {
+      "id": "batch_worker",
+      "label": "批处理数据同步任务",
+      "description": "在 Dev Container 沙盒中执行批处理并与 DDEV 数据库交互",
+      "env": "script",
+      "command": "python scripts/main.py --input {{input_param}} --out {{output_file}}",
+      "timeout_sec": 60,
+      "inputs": [
+        {
+          "name": "input_param",
+          "label": "同步批次编号",
+          "type": "string",
+          "required": true,
+          "default": "BATCH-001"
+        },
+        {
+          "name": "output_file",
+          "label": "输出路径",
+          "type": "string",
+          "required": true,
+          "default": ".devos/artifacts/batch_result.json"
+        }
+      ],
+      "expected_outputs": [
+        {
+          "path": "{{output_file}}",
+          "label": "生成的批处理报告",
+          "preview_type": "table_or_download"
+        }
+      ]
+    }
+  ]
+}

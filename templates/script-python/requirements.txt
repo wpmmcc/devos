@@ -1,0 +1,2 @@
+# Minimal dependencies for Dev Container Python runner
+requests>=2.31.0

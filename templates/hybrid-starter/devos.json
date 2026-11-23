@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "project_id": "proj_template_hybrid",
+  "slug": "hybrid-starter",
+  "name": "Web + 后端脚本混编脚手架",
+  "description": "DDEV 托管 Web 与数据库 + Dev Container 隔离后端脚本与工具链",
+  "project_type": "hybrid",
+  "mode": "DEV_LOCAL",
+  "created_at": "2026-11-23T06:00:00Z",
+  "environments": {
+    "web": {
+      "enabled": true,
+      "driver": "ddev",
+      "config_dir": ".ddev",
+      "primary_url": "https://hybrid-starter.ddev.site",
+      "health_check": {
+        "url": "https://hybrid-starter.ddev.site/health",
+        "expect_status": 200,
+        "timeout_sec": 10
+      },
+      "snapshot_supported": true
+    },
+    "script": {
+      "enabled": true,
+      "driver": "devcontainer",
+      "config_dir": ".devcontainer",
+      "service_name": "app",
+      "workdir": "/workspace",
+      "non_root_user": "vscode",
+      "run_manifest": "devos.run.json"
+    }
+  },
+  "workspace_paths": {
+    "requirements": "requirements/",
+    "standards": "standards/",
+    "board": "board/",
+    "issues": "issues/",
+    "docs": "docs/",
+    "knowledge": "knowledge/",
+    "artifacts": ".devos/artifacts/"
+  },
+  "guardrails": {
+    "allow_destructive_in_modes": ["DEV_LOCAL"],
+    "require_smoke_check_before_testing": true,
+    "protected_paths": [".env", ".ddev/config.yaml"]
+  }
+}

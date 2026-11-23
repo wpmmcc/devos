@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "devos": {
+      "command": "devos-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}

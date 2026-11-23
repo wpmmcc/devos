@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "targets": [
+    {
+      "id": "run_job",
+      "label": "执行主业务脚本",
+      "description": "执行 Python 示例任务，处理输入参数并输出结果",
+      "env": "script",
+      "command": "python scripts/main.py --input {{input_param}} --out {{output_file}}",
+      "timeout_sec": 60,
+      "inputs": [
+        {
+          "name": "input_param",
+          "label": "输入参数",
+          "type": "string",
+          "required": true,
+          "default": "DevOS Hello"
+        },
+        {
+          "name": "output_file",
+          "label": "输出路径",
+          "type": "string",
+          "required": true,
+          "default": ".devos/artifacts/result.json"
+        }
+      ],
+      "expected_outputs": [
+        {
+          "path": "{{output_file}}",
+          "label": "生成的结果文件",
+          "preview_type": "table_or_download"
+        }
+      ],
+      "smoke_test": {
+        "enabled": true,
+        "command": "python scripts/main.py --self-check"
+      }
+    }
+  ]
+}
