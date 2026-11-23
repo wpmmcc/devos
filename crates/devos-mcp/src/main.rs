@@ -410,6 +410,25 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--self-check") {
+        let check_result = json!({
+            "status": "ok",
+            "name": "devos-mcp",
+            "version": env!("CARGO_PKG_VERSION"),
+            "protocolVersion": "2024-11-05",
+            "tools_count": 8,
+            "executable_ok": true
+        });
+        println!("{}", serde_json::to_string_pretty(&check_result).unwrap());
+        return Ok(());
+    }
+
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("devos-mcp {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut reader = stdin.lock();

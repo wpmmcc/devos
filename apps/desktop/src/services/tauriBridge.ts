@@ -133,6 +133,15 @@ export const Bridge = {
   applyAgentConfig: (agentId: string, projectPath?: string) =>
     invokeTauri<string>('apply_agent_config', { agentId, projectPath }),
 
+  uninstallAgentConfig: (agentId: string, projectPath?: string) =>
+    invokeTauri<string>('uninstall_agent_config', { agentId, projectPath }),
+
+  getManualConfigSnippet: (agentId: string) =>
+    invokeTauri<string>('get_manual_config_snippet', { agentId }),
+
+  verifyAgentConnection: (agentId: string, projectPath?: string) =>
+    invokeTauri<boolean>('verify_agent_connection', { agentId, projectPath }),
+
   inspectPortOccupant: (port: number) =>
     invokeTauri<{
       port: number;

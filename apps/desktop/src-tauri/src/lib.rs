@@ -582,6 +582,34 @@ fn apply_agent_config(agent_id: String, project_path: Option<String>) -> ApiResp
     to_api_resp(res)
 }
 
+#[tauri::command]
+fn uninstall_agent_config(agent_id: String, project_path: Option<String>) -> ApiResponse<String> {
+    let root_path = project_path.as_deref().map(Path::new);
+    let res = AgentConfigManager::uninstall_agent_config(&agent_id, root_path);
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn get_manual_config_snippet(agent_id: String) -> ApiResponse<String> {
+    let snippet = AgentConfigManager::get_manual_config_snippet(&agent_id, None);
+    ApiResponse::success(snippet)
+}
+
+#[tauri::command]
+fn verify_agent_connection(agent_id: String, project_path: Option<String>) -> ApiResponse<bool> {
+    let root_path = project_path.as_deref().map(Path::new);
+    let cfg_path = AgentConfigManager::resolve_config_path(&agent_id, root_path);
+    let meta = AgentConfigManager::supported_adapters()
+        .iter()
+        .find(|a| a.id == agent_id);
+    if let Some(m) = meta {
+        let is_ok = AgentConfigManager::is_mcp_configured(&cfg_path, m.format);
+        ApiResponse::success(is_ok)
+    } else {
+        ApiResponse::success(false)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -614,6 +642,9 @@ pub fn run() {
             restore_snapshot,
             detect_installed_agents,
             apply_agent_config,
+            uninstall_agent_config,
+            get_manual_config_snippet,
+            verify_agent_connection,
             inspect_port_occupant,
             reconfigure_web_ports
         ])

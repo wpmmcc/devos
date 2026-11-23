@@ -20,3 +20,4 @@ dirs = { workspace = true }
 tempfile = { workspace = true }
 walkdir = { workspace = true }
 tracing = { workspace = true }
+toml_edit = { workspace = true }
