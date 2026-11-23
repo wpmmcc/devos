@@ -43,10 +43,8 @@ jobs:
 
       - name: Add Windows npm bin to PATH
         if: runner.os == 'Windows'
-        shell: pwsh
         run: |
-          $npmPrefix = npm config get prefix
-          "$npmPrefix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          python -c "import os, subprocess; prefix = subprocess.check_output('npm config get prefix', shell=True, text=True).strip(); f = open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8'); f.write(prefix + '\n'); f.close()"
 
       - name: Setup DDEV (Ubuntu)
         if: runner.os == 'Linux'
@@ -57,17 +55,12 @@ jobs:
       - name: Setup DDEV (macOS)
         if: runner.os == 'macOS'
         run: |
-          curl -fsSL "https://github.com/ddev/ddev/releases/latest/download/ddev_macos-arm64.tar.gz" | sudo tar -xz -C /usr/local/bin ddev
-          sudo chmod +x /usr/local/bin/ddev
+          python3 -c "import os, urllib.request, json; data = json.loads(urllib.request.urlopen('https://api.github.com/repos/ddev/ddev/releases/latest').read()); url = [a['browser_download_url'] for a in data['assets'] if 'macos-arm64' in a['name'] and a['name'].endswith('.tar.gz')][0]; os.system(f'curl -fsSL \"{url}\" | sudo tar -xz -C /usr/local/bin ddev'); os.system('sudo chmod +x /usr/local/bin/ddev')"
 
       - name: Setup DDEV (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path C:\tools\ddev
-          Invoke-WebRequest -Uri "https://github.com/ddev/ddev/releases/latest/download/ddev_windows-amd64.zip" -OutFile C:\tools\ddev\ddev.zip
-          Expand-Archive -Path C:\tools\ddev\ddev.zip -DestinationPath C:\tools\ddev -Force
-          "C:\tools\ddev" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          python -c "import os, zipfile, urllib.request, json; from pathlib import Path; data = json.loads(urllib.request.urlopen('https://api.github.com/repos/ddev/ddev/releases/latest').read()); url = [a['browser_download_url'] for a in data['assets'] if 'windows-amd64' in a['name'] and a['name'].endswith('.zip')][0]; tools = Path('C:/tools/ddev'); tools.mkdir(parents=True, exist_ok=True); zip_p = tools / 'ddev.zip'; urllib.request.urlretrieve(url, zip_p); zipfile.ZipFile(zip_p).extractall(tools); f = open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8'); f.write(str(tools) + '\n'); f.close()"
 
       - name: Verify Framework Engines Execution
         shell: bash
