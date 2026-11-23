@@ -12,6 +12,7 @@ Validates the entire workstation lifecycle across:
   8. Desktop Frontend Static & Typecheck Verification
 """
 
+import io
 import json
 import os
 import shutil
@@ -20,6 +21,14 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+# Force UTF-8 on Windows and any non-UTF8 terminal
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+elif sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 bin_ext = ".exe" if sys.platform == "win32" else ""

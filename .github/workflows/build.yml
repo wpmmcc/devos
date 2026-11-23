@@ -51,6 +51,8 @@ jobs:
         run: cargo run -p devos-cli -- doctor --json
 
       - name: Run Comprehensive E2E Simulation Test
+        env:
+          PYTHONIOENCODING: "utf-8"
         run: |
           python scripts/test_e2e_comprehensive.py
 
