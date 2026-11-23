@@ -15,6 +15,7 @@ export const IssuesView: React.FC<IssuesViewProps> = ({
 }) => {
   const [filter, setFilter] = useState<'all' | 'open' | 'ready_for_retest' | 'closed'>('all');
   const [expandedTech, setExpandedTech] = useState<Record<string, boolean>>({});
+  const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({});
 
   const filtered = issues.filter((iss) => {
     if (filter === 'open') return iss.status === 'open' || iss.status === 'reopened' || iss.status === 'in_progress';
@@ -145,27 +146,50 @@ export const IssuesView: React.FC<IssuesViewProps> = ({
 
                     {/* Retest Actions Buttons */}
                     {isReadyForRetest && (
-                      <div className="pt-2 flex items-center gap-2 border-t border-emerald-500/20">
-                        <button
-                          onClick={onNavigateToTest}
-                          className="px-3 py-1 bg-[#1e2330] hover:bg-[#282f42] text-slate-200 text-xs rounded-md transition font-medium"
-                        >
-                          去测试台复测
-                        </button>
-                        <button
-                          onClick={() => onRetest(iss.issue_id, true, '经复测确认已修复')}
-                          className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs rounded-md transition flex items-center gap-1"
-                        >
-                          <Check size={12} />
-                          <span>确认已修好</span>
-                        </button>
-                        <button
-                          onClick={() => onRetest(iss.issue_id, false, '复测依然报错')}
-                          className="px-3 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-600/30 text-xs rounded-md transition flex items-center gap-1"
-                        >
-                          <X size={12} />
-                          <span>还是不行</span>
-                        </button>
+                      <div className="pt-2 space-y-2 border-t border-emerald-500/20">
+                        <input
+                          type="text"
+                          placeholder="输入复测补充说明（可选，例如：发票金额计算正确）..."
+                          value={feedbackInputs[iss.issue_id] || ''}
+                          onChange={(e) =>
+                            setFeedbackInputs({ ...feedbackInputs, [iss.issue_id]: e.target.value })
+                          }
+                          className="w-full bg-[#0d1017] border border-[#283042] rounded px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={onNavigateToTest}
+                            className="px-3 py-1 bg-[#1e2330] hover:bg-[#282f42] text-slate-200 text-xs rounded-md transition font-medium"
+                          >
+                            去测试台复测
+                          </button>
+                          <button
+                            onClick={() =>
+                              onRetest(
+                                iss.issue_id,
+                                true,
+                                feedbackInputs[iss.issue_id] || '经复测确认已修复'
+                              )
+                            }
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs rounded-md transition flex items-center gap-1"
+                          >
+                            <Check size={12} />
+                            <span>验收通过 · 关闭问题</span>
+                          </button>
+                          <button
+                            onClick={() =>
+                              onRetest(
+                                iss.issue_id,
+                                false,
+                                feedbackInputs[iss.issue_id] || '复测依然未达预期'
+                              )
+                            }
+                            className="px-3 py-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-600/30 text-xs rounded-md transition flex items-center gap-1"
+                          >
+                            <X size={12} />
+                            <span>仍有问题 · 重新打开</span>
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

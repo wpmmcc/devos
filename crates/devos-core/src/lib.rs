@@ -1,20 +1,24 @@
+pub mod agent_config;
 pub mod board;
 pub mod daemon;
 pub mod db;
 pub mod error;
 pub mod fs_utils;
+pub mod guardrail;
 pub mod issue;
 pub mod port;
 pub mod project;
 pub mod watcher;
 
+pub use agent_config::{AgentConfigManager, AgentDetection};
 pub use board::BoardManager;
 pub use daemon::DaemonManager;
 pub use db::Database;
 pub use error::{DevosError, Result};
 pub use fs_utils::{atomic_write, atomic_write_json, ensure_within_root, read_json, read_to_string, to_posix_path};
+pub use guardrail::Guardrails;
 pub use issue::IssueManager;
-pub use port::PortRegistry;
+pub use port::{PortAllocation, PortRegistry};
 pub use project::ProjectManager;
 pub use watcher::{ProjectChangeEvent, ProjectWatcher};
 

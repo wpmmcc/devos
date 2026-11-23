@@ -101,6 +101,14 @@ enum Commands {
 
     /// Preflight environment doctor check
     Doctor,
+
+    /// Manage AI agent MCP connection configs (Claude Desktop, Cursor, Factory Droid, etc.)
+    AgentConfig {
+        #[arg(long)]
+        detect: bool,
+        #[arg(long)]
+        apply: Option<String>,
+    },
 }
 
 fn print_result<T: serde::Serialize>(json_mode: bool, res: Result<T>) {
@@ -258,6 +266,7 @@ async fn main() {
                         Ok(serde_json::to_value(st)?)
                     }
                     "down" => {
+                        devos_core::Guardrails::check_destructive_allowed(&project, "down")?;
                         driver.down(&root)?;
                         Ok(serde_json::json!({ "status": "stopped" }))
                     }
@@ -283,6 +292,7 @@ async fn main() {
                             hint: Some("Specify --snapshot-name <name>".to_string()),
                             plain_message: Some("还原快照时请指定快照名称".to_string()),
                         })?;
+                        devos_core::Guardrails::check_destructive_allowed(&project, "restore")?;
                         driver.restore(&root, &name)?;
                         Ok(serde_json::json!({ "snapshot_restored": name }))
                     }
@@ -499,6 +509,26 @@ async fn main() {
         Commands::Doctor => {
             let diags = PreflightDoctor::diagnose_all();
             print_result(json_mode, Ok(diags));
+        }
+
+        Commands::AgentConfig { detect: _, apply } => {
+            let res = (|| -> Result<serde_json::Value> {
+                let loaded = ProjectManager::find_and_load(".").ok().map(|(r, _)| r);
+                let project_root = cli.project_dir.as_deref().or(loaded.as_deref());
+
+                if let Some(target) = apply {
+                    let msg = devos_core::AgentConfigManager::configure_agent(
+                        &target,
+                        None,
+                        project_root,
+                    )?;
+                    Ok(serde_json::json!({ "status": "ok", "message": msg }))
+                } else {
+                    let list = devos_core::AgentConfigManager::detect_agents(project_root);
+                    Ok(serde_json::to_value(list)?)
+                }
+            })();
+            print_result(json_mode, res);
         }
     }
 }

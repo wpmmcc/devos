@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { BookOpen, ShieldAlert, FileText, Lightbulb, Code2 } from 'lucide-react';
-import { DevosProject } from '../types';
+import React, { useEffect, useState } from 'react';
+import { BookOpen, ShieldAlert, FileText, Lightbulb, Code2, Bot, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { AgentDetection, DevosProject } from '../types';
+import { Bridge } from '../services/tauriBridge';
 
 interface AssetsViewProps {
   project: DevosProject;
@@ -8,8 +9,39 @@ interface AssetsViewProps {
 
 export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
   const [selectedAsset, setSelectedAsset] = useState<
-    'requirements' | 'standards' | 'docs' | 'knowledge' | 'run_manifest'
+    'standards' | 'requirements' | 'run_manifest' | 'knowledge' | 'docs' | 'agents'
   >('standards');
+
+  const [agents, setAgents] = useState<AgentDetection[]>([]);
+  const [isLoadingAgents, setIsLoadingAgents] = useState(false);
+  const [configuringId, setConfiguringId] = useState<string | null>(null);
+
+  const loadAgents = async () => {
+    setIsLoadingAgents(true);
+    const res = await Bridge.detectAgents();
+    if (res.ok && res.data) {
+      setAgents(res.data);
+    }
+    setIsLoadingAgents(false);
+  };
+
+  useEffect(() => {
+    if (selectedAsset === 'agents') {
+      loadAgents();
+    }
+  }, [selectedAsset]);
+
+  const handleConnectAgent = async (agentId: string) => {
+    setConfiguringId(agentId);
+    const res = await Bridge.applyAgentConfig(agentId);
+    if (res.ok) {
+      alert(res.data || 'MCP 配置已成功注入！');
+      loadAgents();
+    } else {
+      alert(`连接失败: ${res.error?.plain_message || res.error?.message}`);
+    }
+    setConfiguringId(null);
+  };
 
   return (
     <div className="flex-1 flex bg-[#0b0d13] overflow-hidden">
@@ -76,11 +108,105 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
           <FileText size={14} className="text-slate-400" />
           <span>用户使用文档</span>
         </button>
+
+        <div className="pt-2 border-t border-[#1e2330]">
+          <button
+            onClick={() => setSelectedAsset('agents')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition ${
+              selectedAsset === 'agents'
+                ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+                : 'text-slate-300 hover:bg-[#1a1f2c]'
+            }`}
+          >
+            <Bot size={14} className="text-cyan-400" />
+            <span>AI Agent 一键连接</span>
+          </button>
+        </div>
       </div>
 
       {/* Right Content Editor / Viewer */}
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="max-w-3xl w-full mx-auto bg-[#141824] border border-[#222938] rounded-xl p-6">
+          {selectedAsset === 'agents' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-[#222938] pb-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <Bot size={18} className="text-cyan-400" />
+                    <span>外部 AI Agent 工具一键连接</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    DevOS 自动扫描本地安装的 Agent，一键向其注入 devos-mcp 标准工具链。
+                  </p>
+                </div>
+                <button
+                  onClick={loadAgents}
+                  disabled={isLoadingAgents}
+                  className="p-1.5 rounded bg-[#1e2330] hover:bg-[#283042] text-slate-300 transition"
+                  title="刷新检测状态"
+                >
+                  <RefreshCw size={13} className={isLoadingAgents ? 'animate-spin' : ''} />
+                </button>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                {agents.map((ag) => (
+                  <div
+                    key={ag.id}
+                    className="p-4 bg-[#0d1017] rounded-xl border border-[#202738] flex items-center justify-between"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-xs text-slate-100">{ag.name}</span>
+                        {ag.installed ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+                            已检测到安装
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500">
+                            未安装
+                          </span>
+                        )}
+                        {ag.configured && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 flex items-center gap-1">
+                            <CheckCircle2 size={10} />
+                            <span>已接入 DevOS MCP</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400">{ag.description}</div>
+                      <div className="text-[10px] text-slate-500 font-mono truncate max-w-lg">
+                        配置位置: {ag.config_path}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleConnectAgent(ag.id)}
+                      disabled={configuringId === ag.id}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                        ag.configured
+                          ? 'bg-[#1b2230] text-slate-300 hover:bg-[#252f42] border border-[#2d3850]'
+                          : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-950/30'
+                      }`}
+                    >
+                      {configuringId === ag.id
+                        ? '正在配置...'
+                        : ag.configured
+                        ? '重新同步配置'
+                        : '一键连接'}
+                    </button>
+                  </div>
+                ))}
+
+                {agents.length === 0 && (
+                  <div className="text-center py-10 text-xs text-slate-500">
+                    正在扫描本地 AI Agent...
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {selectedAsset === 'standards' && (
             <div className="prose prose-invert text-xs space-y-4">
               <h2 className="text-base font-bold text-slate-100 border-b border-[#222938] pb-2">

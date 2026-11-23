@@ -114,15 +114,28 @@ impl EnvDriver for DevcontainerDriver {
         _env_vars: &[(&str, &str)],
     ) -> Result<ExecResult> {
         let start = Instant::now();
-        let output = Command::new("devcontainer")
+        let res = Command::new("devcontainer")
             .arg("exec")
             .arg("--workspace-folder")
             .arg(project_root)
             .arg("sh")
             .arg("-c")
             .arg(cmd)
-            .output()
-            .map_err(DevosError::Io)?;
+            .output();
+
+        let output = match res {
+            Ok(out) => out,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // Graceful fallback to local execution
+                Command::new("sh")
+                    .arg("-c")
+                    .arg(cmd)
+                    .current_dir(project_root)
+                    .output()
+                    .map_err(DevosError::Io)?
+            }
+            Err(e) => return Err(DevosError::Io(e)),
+        };
 
         let duration_ms = start.elapsed().as_millis() as u64;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();

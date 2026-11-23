@@ -224,6 +224,7 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                     "status" => Ok(serde_json::to_value(driver.status(&root)?)?),
                     "up" => Ok(serde_json::to_value(driver.up(&root)?)?),
                     "down" => {
+                        devos_core::Guardrails::check_destructive_allowed(&project, "down")?;
                         driver.down(&root)?;
                         Ok(json!({ "stopped": true }))
                     }
@@ -244,6 +245,7 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                     }
                     "restore" => {
                         let name = arguments["snapshot_name"].as_str().unwrap_or("mcp_snap");
+                        devos_core::Guardrails::check_destructive_allowed(&project, "restore")?;
                         driver.restore(&root, name)?;
                         Ok(json!({ "restored": name }))
                     }
@@ -293,6 +295,9 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                 let targets: Vec<String> = serde_json::from_value(
                     arguments["run_target_ids"].clone()
                 ).unwrap_or_default();
+
+                // Check smoke & requirements before submission
+                devos_core::Guardrails::check_smoke_before_testing(&root, &project)?;
 
                 let card = BoardManager::submit_for_testing(
                     &root,

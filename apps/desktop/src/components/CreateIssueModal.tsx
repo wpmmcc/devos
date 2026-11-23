@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Bug, ArrowRight } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Bug, ArrowRight, Activity, Terminal, Globe } from 'lucide-react';
 import { SourceType } from '../types';
 
 interface CreateIssueModalProps {
@@ -15,9 +15,17 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [title, setTitle] = useState(initialData?.title || '');
-  const [description, setDescription] = useState(initialData?.description || '');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [expected, setExpected] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setTitle(initialData?.title || '');
+      setDescription(initialData?.description || '');
+      setExpected(initialData?.expected_behavior || '');
+    }
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
@@ -27,6 +35,8 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
     onSubmit(title, description, expected, initialData);
     onClose();
   };
+
+  const isScript = initialData?.source_type === 'script_run';
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -40,7 +50,9 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
 
         <div className="flex items-center gap-2 mb-1">
           <Bug size={18} className="text-rose-400" />
-          <h2 className="text-base font-bold text-slate-100">反馈测试问题 (提 Issue)</h2>
+          <h2 className="text-base font-bold text-slate-100">
+            {isScript ? '反馈脚本测试失败 (提 Issue)' : '反馈页面测试问题 (提 Issue)'}
+          </h2>
         </div>
         <p className="text-xs text-slate-400 mb-5">
           用大白话描述您遇到的问题，DevOS 后台已自动打包当前报错堆栈与环境日志供 AI 助手诊断。
@@ -52,7 +64,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             <input
               type="text"
               required
-              placeholder="例如：点击导出 Excel 按钮没有反应"
+              placeholder={isScript ? '例如：脚本无法解析发票金额字段' : '例如：点击导出 Excel 按钮没有反应'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full bg-[#0d1017] border border-[#283042] rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
@@ -64,7 +76,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             <textarea
               rows={3}
               required
-              placeholder="例如：在页面勾选了发票记录，点击导出后转圈但没有弹出下载文件。"
+              placeholder={isScript ? '例如：运行 python scripts/export.py 时抛出 KeyError 异常。' : '例如：在页面勾选了发票记录，点击导出后转圈但没有弹出下载文件。'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full bg-[#0d1017] border border-[#283042] rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500 resize-none"
@@ -75,17 +87,39 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
             <label className="text-xs font-semibold text-slate-300">预期效果</label>
             <input
               type="text"
-              placeholder="例如：应正常下载 invoices_result.xlsx 文件"
+              placeholder={isScript ? '例如：应生成正确的 export_result.xlsx 并正常退出' : '例如：应正常下载 invoices_result.xlsx 文件'}
               value={expected}
               onChange={(e) => setExpected(e.target.value)}
               className="w-full bg-[#0d1017] border border-[#283042] rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
             />
           </div>
 
-          <div className="p-3 bg-[#0d1017] rounded-lg border border-[#222938] text-[11px] text-slate-400 space-y-1">
-            <div className="text-emerald-400 font-medium">✓ 后台已自动关联环境排障包：</div>
-            <div>• 最近 30 秒浏览器 Console 报错与 HTTP 500 请求日志</div>
-            <div>• 容器标准输出与错误堆栈信息</div>
+          {/* Context Diagnostics Badge */}
+          <div className="p-3 bg-[#0d1017] rounded-lg border border-[#222938] text-[11px] text-slate-400 space-y-1.5">
+            <div className="text-emerald-400 font-medium flex items-center gap-1.5">
+              <Activity size={13} />
+              <span>DevOS 后台已自动关联环境排障包：</span>
+            </div>
+
+            {isScript ? (
+              <div className="space-y-1 pl-4 text-slate-300 font-mono text-[10px]">
+                <div className="flex items-center gap-1">
+                  <Terminal size={11} className="text-rose-400" />
+                  <span>任务: {initialData?.script?.run_target_id} (退出码: {initialData?.script?.exit_code})</span>
+                </div>
+                <div>耗时: {initialData?.script?.duration_ms}ms</div>
+                <div className="text-slate-400 truncate">命令: {initialData?.script?.command_executed}</div>
+              </div>
+            ) : (
+              <div className="space-y-1 pl-4 text-slate-300 text-[10px]">
+                <div className="flex items-center gap-1">
+                  <Globe size={11} className="text-emerald-400" />
+                  <span className="font-mono">{initialData?.url || '本地 Web 预览'}</span>
+                </div>
+                <div>• 最近 30 秒浏览器 Console 报错: {initialData?.console_errors?.length || 0} 条</div>
+                <div>• 网络 HTTP 异常请求记录: {initialData?.failed_requests?.length || 0} 条</div>
+              </div>
+            )}
           </div>
 
           <button

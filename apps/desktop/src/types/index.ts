@@ -194,6 +194,15 @@ export interface DiagnosticItem {
   fix_hint?: string;
 }
 
+export interface AgentDetection {
+  id: string;
+  name: string;
+  installed: boolean;
+  config_path: string;
+  configured: boolean;
+  description: string;
+}
+
 export interface ApiResponse<T> {
   ok: boolean;
   data?: T;

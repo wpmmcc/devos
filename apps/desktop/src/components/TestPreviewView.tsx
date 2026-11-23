@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
-import { Globe, Terminal, Play, AlertCircle, CheckCircle2, RotateCw, ExternalLink, Bug, FileText, CheckSquare, Square } from 'lucide-react';
+import {
+  Globe,
+  Terminal,
+  Play,
+  AlertCircle,
+  CheckCircle2,
+  RotateCw,
+  ExternalLink,
+  Bug,
+  FileText,
+  CheckSquare,
+  Square,
+  Camera,
+  Save,
+  Power,
+} from 'lucide-react';
 import { BoardCard, DevosProject, RunManifest, RunTarget, ScriptContext } from '../types';
+import { devosProbe } from '../utils/probe';
+import { Bridge } from '../services/tauriBridge';
 
 interface TestPreviewViewProps {
   project: DevosProject;
@@ -54,6 +71,33 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
     );
   };
 
+  const [isSnapshotting, setIsSnapshotting] = useState(false);
+
+  const handleCreateSnapshot = async () => {
+    const name = window.prompt('请输入快照名称（如 baseline_v1）：', '');
+    if (name === null) return;
+    setIsSnapshotting(true);
+    const res = await Bridge.createSnapshot('.', name);
+    if (res.ok) {
+      alert(`已成功创建数据库与环境快照：${res.data}`);
+    } else {
+      alert(`创建快照失败: ${res.error?.plain_message || res.error?.message}`);
+    }
+    setIsSnapshotting(false);
+  };
+
+  const handleTriggerWebIssue = () => {
+    const probeData = devosProbe.getSnapshot();
+    onOpenCreateIssue({
+      source_type: 'web_preview',
+      url: previewUrl,
+      console_errors: probeData.console_errors,
+      failed_requests: probeData.failed_requests,
+      title: '页面功能异常',
+      description: '在 Web 页面预览测试时发现异常行为。',
+    });
+  };
+
   const handleRunScript = async () => {
     if (!currentTarget) return;
     setIsRunning(true);
@@ -96,20 +140,29 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
           )}
         </div>
 
-        {mode === 'web' && (
-          <button
-            onClick={() =>
-              onOpenCreateIssue({
-                source_type: 'web_preview',
-                url: previewUrl,
-              })
-            }
-            className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-xs font-medium shadow-md shadow-rose-950/30 transition animate-bounce"
-          >
-            <Bug size={13} />
-            <span>反馈问题 / 提 Issue</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {mode === 'web' && (
+            <>
+              <button
+                onClick={handleCreateSnapshot}
+                disabled={isSnapshotting}
+                className="flex items-center gap-1.5 px-3 py-1 bg-[#1a2130] hover:bg-[#232b3d] text-slate-300 hover:text-white rounded-md text-xs font-medium border border-[#2d374d] transition"
+                title="保存数据库与环境快照"
+              >
+                <Camera size={13} className="text-amber-400" />
+                <span>{isSnapshotting ? '正在生成快照...' : '保存环境快照'}</span>
+              </button>
+
+              <button
+                onClick={handleTriggerWebIssue}
+                className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-xs font-medium shadow-md shadow-rose-950/30 transition animate-bounce"
+              >
+                <Bug size={13} />
+                <span>反馈问题 / 提 Issue</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Main Mode Body */}
@@ -155,16 +208,10 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                   <div>✓ 实时报错探针已注入（提问题时自动附带 30 秒日志与网络错误）</div>
                 </div>
                 <button
-                  onClick={() =>
-                    onOpenCreateIssue({
-                      source_type: 'web_preview',
-                      url: previewUrl,
-                      title: '点击按钮未产生预期响应',
-                    })
-                  }
+                  onClick={handleTriggerWebIssue}
                   className="w-full py-2 bg-[#22c55e] hover:bg-emerald-500 text-slate-950 font-semibold rounded-lg text-xs transition"
                 >
-                  测试出现问题？点此框选截图标注
+                  测试出现问题？点此反馈（自动附带报错探针日志）
                 </button>
               </div>
             </div>

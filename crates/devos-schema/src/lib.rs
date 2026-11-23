@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod board;
 pub mod daemon;
 pub mod decision;
@@ -6,6 +7,7 @@ pub mod project;
 pub mod response;
 pub mod run_manifest;
 
+pub use agent::AgentDetection;
 pub use board::{BoardCard, BoardColumn, ChecklistStep};
 pub use daemon::DaemonInfo;
 pub use decision::{DecisionOption, DecisionRequest};

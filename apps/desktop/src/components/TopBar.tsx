@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Play, Square, Camera, TerminalSquare, Globe, Cpu } from 'lucide-react';
 import { DevosProject } from '../types';
+import { Bridge } from '../services/tauriBridge';
 
 interface TopBarProps {
   project: DevosProject | null;
@@ -18,6 +19,40 @@ export const TopBar: React.FC<TopBarProps> = ({
   testingCount,
 }) => {
   const [isRunning, setIsRunning] = useState(true);
+  const [isBusy, setIsBusy] = useState(false);
+
+  const handleToggleEnv = async () => {
+    if (!project || isBusy) return;
+    setIsBusy(true);
+    if (isRunning) {
+      const res = await Bridge.stopEnv('.', 'auto');
+      if (res.ok) {
+        setIsRunning(false);
+      } else if (res.error) {
+        alert(`无法停止环境: ${res.error.plain_message || res.error.message}`);
+      }
+    } else {
+      const res = await Bridge.startEnv('.', 'auto');
+      if (res.ok) {
+        setIsRunning(true);
+      } else if (res.error) {
+        alert(`启动环境失败: ${res.error.plain_message || res.error.message}`);
+      }
+    }
+    setIsBusy(false);
+  };
+
+  const handleSnapshot = async () => {
+    if (!project) return;
+    const name = window.prompt('请输入快照名称（如 baseline_v1）：', '');
+    if (name === null) return;
+    const res = await Bridge.createSnapshot('.', name);
+    if (res.ok) {
+      alert(`已成功创建数据库与环境快照：${res.data}`);
+    } else {
+      alert(`创建快照失败: ${res.error?.plain_message || res.error?.message}`);
+    }
+  };
 
   if (!project) {
     return (
@@ -111,14 +146,17 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Start / Stop Toggle */}
         <button
-          onClick={() => setIsRunning(!isRunning)}
+          onClick={handleToggleEnv}
+          disabled={isBusy}
           className={`flex items-center gap-1.5 px-3 py-1.2 rounded-md text-xs font-medium border transition ${
             isRunning
               ? 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
               : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
           }`}
         >
-          {isRunning ? (
+          {isBusy ? (
+            <span>处理中...</span>
+          ) : isRunning ? (
             <>
               <Square size={12} />
               <span>停止环境</span>
@@ -133,7 +171,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Take Snapshot */}
         <button
-          onClick={() => alert('已成功为当前代码与数据保存快照！')}
+          onClick={handleSnapshot}
           className="flex items-center gap-1 px-2.5 py-1.2 rounded-md text-xs font-medium bg-[#1e2330] hover:bg-[#282f42] text-slate-300 transition border border-[#2c3346]"
           title="保存当前可用状态"
         >

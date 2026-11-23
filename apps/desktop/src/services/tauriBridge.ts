@@ -88,6 +88,21 @@ export const Bridge = {
       failedRequests,
     }),
 
+  createScriptIssue: (
+    projectPath: string,
+    title: string,
+    description: string,
+    expectedBehavior?: string,
+    scriptContext?: ScriptContext
+  ) =>
+    invokeTauri<Issue>('create_script_issue', {
+      projectPath,
+      title,
+      description,
+      expectedBehavior,
+      scriptContext,
+    }),
+
   retestIssue: (projectPath: string, issueId: string, passed: boolean, feedback: string) =>
     invokeTauri<Issue>('retest_issue', { projectPath, issueId, passed, feedback }),
 
@@ -105,6 +120,18 @@ export const Bridge = {
 
   stopEnv: (projectPath: string, target: string) =>
     invokeTauri<boolean>('stop_environment', { projectPath, target }),
+
+  createSnapshot: (projectPath: string, name = '') =>
+    invokeTauri<string>('create_snapshot', { projectPath, name }),
+
+  restoreSnapshot: (projectPath: string, name: string) =>
+    invokeTauri<string>('restore_snapshot', { projectPath, name }),
+
+  detectAgents: (projectPath?: string) =>
+    invokeTauri<any[]>('detect_installed_agents', { projectPath }),
+
+  applyAgentConfig: (agentId: string, projectPath?: string) =>
+    invokeTauri<string>('apply_agent_config', { agentId, projectPath }),
 };
 
 // Mock Fallbacks for Browser

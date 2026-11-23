@@ -1,13 +1,13 @@
 use devos_core::{
-    fs_utils::read_json, BoardManager, Database, DevosError, IssueManager, ProjectChangeEvent,
-    ProjectManager, ProjectWatcher, Result,
+    ensure_within_root, fs_utils::read_json, AgentConfigManager, BoardManager, Database, DevosError,
+    Guardrails, IssueManager, ProjectChangeEvent, ProjectManager, ProjectWatcher, Result,
 };
 use devos_env::{
     DdevDriver, DevcontainerDriver, DiagnosticItem, EnvDriver, EnvStatus, PreflightDoctor,
 };
 use devos_schema::{
-    ApiResponse, BoardCard, BoardColumn, DevosProject, Issue, IssueSeverity, ProjectType,
-    RunManifest, SourceType,
+    AgentDetection, ApiResponse, BoardCard, BoardColumn, DevosProject, Issue, IssueSeverity,
+    ProjectType, RunManifest, SourceType,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -272,6 +272,38 @@ fn create_web_issue(
 }
 
 #[tauri::command]
+fn create_script_issue(
+    app: AppHandle,
+    project_path: String,
+    title: String,
+    description: String,
+    expected_behavior: Option<String>,
+    script_context: devos_schema::ScriptContext,
+) -> ApiResponse<Issue> {
+    let res = (|| -> Result<Issue> {
+        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let mut context = devos_schema::CapturedContext::default();
+        context.script = Some(script_context);
+
+        let issue = IssueManager::create_issue(
+            &root,
+            &project,
+            &title,
+            &description,
+            expected_behavior,
+            IssueSeverity::High,
+            SourceType::ScriptRun,
+            context,
+            None,
+            None,
+        )?;
+        let _ = app.emit("devos://issues-updated", &issue.issue_id);
+        Ok(issue)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
 fn retest_issue(
     app: AppHandle,
     project_path: String,
@@ -329,6 +361,15 @@ fn execute_script_target(
                     serde_json::Value::String(s) => s.clone(),
                     _ => v.to_string(),
                 };
+
+                // Validate inputs that look like file paths against directory traversal
+                if v_str.contains('/') || v_str.contains('\\') || v_str.contains("..") {
+                    let path = Path::new(&v_str);
+                    if path.is_relative() {
+                        let _ = ensure_within_root(&root, path)?;
+                    }
+                }
+
                 cmd = cmd.replace(&format!("{{{{{}}}}}", k), &v_str);
             }
         }
@@ -382,6 +423,7 @@ fn start_environment(project_path: String, target: String) -> ApiResponse<EnvSta
 fn stop_environment(project_path: String, target: String) -> ApiResponse<bool> {
     let res = (|| -> Result<bool> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        Guardrails::check_destructive_allowed(&project, "down")?;
         let driver: Box<dyn EnvDriver> = match (target.as_str(), &project.project_type) {
             ("script", _) => Box::new(DevcontainerDriver::new()),
             _ => Box::new(DdevDriver::new()),
@@ -389,6 +431,54 @@ fn stop_environment(project_path: String, target: String) -> ApiResponse<bool> {
         driver.down(&root)?;
         Ok(true)
     })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn create_snapshot(project_path: String, name: String) -> ApiResponse<String> {
+    let res = (|| -> Result<String> {
+        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let snap_name = if name.trim().is_empty() {
+            format!("snap_{}", chrono::Utc::now().format("%Y%m%d_%H%M%S"))
+        } else {
+            name.trim().to_string()
+        };
+        let driver: Box<dyn EnvDriver> = match project.project_type {
+            ProjectType::Script => Box::new(DevcontainerDriver::new()),
+            _ => Box::new(DdevDriver::new()),
+        };
+        driver.snapshot(&root, &snap_name)?;
+        Ok(snap_name)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn restore_snapshot(project_path: String, name: String) -> ApiResponse<String> {
+    let res = (|| -> Result<String> {
+        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        Guardrails::check_destructive_allowed(&project, "restore")?;
+        let driver: Box<dyn EnvDriver> = match project.project_type {
+            ProjectType::Script => Box::new(DevcontainerDriver::new()),
+            _ => Box::new(DdevDriver::new()),
+        };
+        driver.restore(&root, &name)?;
+        Ok(name)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn detect_installed_agents(project_path: Option<String>) -> ApiResponse<Vec<AgentDetection>> {
+    let root_path = project_path.as_deref().map(Path::new);
+    let list = AgentConfigManager::detect_agents(root_path);
+    ApiResponse::success(list)
+}
+
+#[tauri::command]
+fn apply_agent_config(agent_id: String, project_path: Option<String>) -> ApiResponse<String> {
+    let root_path = project_path.as_deref().map(Path::new);
+    let res = AgentConfigManager::configure_agent(&agent_id, None, root_path);
     to_api_resp(res)
 }
 
@@ -406,12 +496,17 @@ pub fn run() {
             move_board_card,
             list_issues,
             create_web_issue,
+            create_script_issue,
             retest_issue,
             get_run_manifest,
             execute_script_target,
             get_env_status,
             start_environment,
-            stop_environment
+            stop_environment,
+            create_snapshot,
+            restore_snapshot,
+            detect_installed_agents,
+            apply_agent_config
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

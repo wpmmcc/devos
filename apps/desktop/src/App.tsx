@@ -154,18 +154,32 @@ export const App: React.FC = () => {
     data: any
   ) => {
     if (!project) return;
-    const res = await Bridge.createWebIssue(
-      currentProjectPath,
-      title,
-      description,
-      data?.url || 'https://invoice-helper.ddev.site',
-      expected,
-      [],
-      []
-    );
+    let res;
+    if (data?.source_type === 'script_run') {
+      res = await Bridge.createScriptIssue(
+        currentProjectPath,
+        title,
+        description,
+        expected,
+        data.script
+      );
+    } else {
+      res = await Bridge.createWebIssue(
+        currentProjectPath,
+        title,
+        description,
+        data?.url || 'https://invoice-helper.ddev.site',
+        expected,
+        data?.console_errors || [],
+        data?.failed_requests || []
+      );
+    }
+
     if (res.ok) {
       refreshIssues();
       setActiveTab('issues');
+    } else if (res.error) {
+      alert(`提交 Issue 失败: ${res.error.plain_message || res.error.message}`);
     }
   };
 
@@ -180,6 +194,10 @@ export const App: React.FC = () => {
       <Sidebar
         currentProject={project}
         recentProjects={recentProjects}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        openIssuesCount={openIssuesCount}
+        testingCount={testingCount}
         onSelectProjectByPath={(path) => loadProjectData(path)}
         onOpenNewProject={() => setIsNewProjectOpen(true)}
         onOpenDoctor={() => setIsDoctorOpen(true)}
