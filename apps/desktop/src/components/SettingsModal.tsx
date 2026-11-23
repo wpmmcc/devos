@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Settings, Globe, Shield, Download, RefreshCw, X, Check, Laptop, Moon, Sun, ArrowUpRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { switchLanguage } from '../i18n';
+import { Bridge } from '../services/tauriBridge';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -18,14 +19,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   if (!isOpen) return null;
 
-  const handleExportDiagnostics = () => {
+  const handleExportDiagnostics = async () => {
     setIsExporting(true);
-    setTimeout(() => {
+    try {
+      const res = await Bridge.exportDiagnosticBundle('.');
+      if (res.ok && res.data) {
+        alert(
+          `已成功生成脱敏诊断包并保存至：\n${res.data}\n\n（已强制正则脱敏用户名、代理与真实密钥）`
+        );
+      } else {
+        alert(`生成诊断包失败: ${res.error?.message || '未知错误'}`);
+      }
+    } catch (err: any) {
+      alert(`导出诊断包异常: ${err.message || String(err)}`);
+    } finally {
       setIsExporting(false);
-      alert(
-        '已成功生成脱敏诊断包并保存至桌面：\n~/Desktop/devos-diagnostics-bundle.zip\n\n（已强制正则脱敏用户名、代理与真实密钥）'
-      );
-    }, 1200);
+    }
   };
 
   const handleCheckUpdate = () => {
@@ -33,7 +42,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     setTimeout(() => {
       setIsCheckingUpdate(false);
       alert('当前版本 v0.1.0 已是最新稳定版！已同步 GitHub Releases 规范。');
-    }, 1000);
+    }, 400);
   };
 
   return (

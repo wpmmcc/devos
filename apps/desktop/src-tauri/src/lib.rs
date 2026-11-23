@@ -748,6 +748,79 @@ fn trash_project(project_path: String) -> ApiResponse<String> {
     to_api_resp(res)
 }
 
+#[tauri::command]
+fn list_deploy_plugins() -> ApiResponse<Vec<devos_core::DeployPluginMetadata>> {
+    ApiResponse::success(devos_core::DeployPluginManager::list_plugins())
+}
+
+#[tauri::command]
+fn validate_deploy_target(
+    plugin_id: String,
+    host: String,
+    port: u16,
+    user: String,
+) -> ApiResponse<devos_core::ValidationResult> {
+    let mut cfg = std::collections::HashMap::new();
+    cfg.insert("host".to_string(), host);
+    cfg.insert("port".to_string(), port.to_string());
+    cfg.insert("user".to_string(), user);
+    let res = devos_core::DeployPluginManager::validate_target(&plugin_id, &cfg);
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn plan_deployment(
+    plugin_id: String,
+    project_path: String,
+    host: String,
+    deploy_dir: String,
+) -> ApiResponse<devos_core::DeployPlan> {
+    let res = (|| -> Result<devos_core::DeployPlan> {
+        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let release_dir = root.join("releases");
+        let mut cfg = std::collections::HashMap::new();
+        cfg.insert("host".to_string(), host);
+        cfg.insert("deploy_dir".to_string(), deploy_dir);
+        devos_core::DeployPluginManager::plan_deployment(&plugin_id, &release_dir, &cfg)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn apply_deployment(
+    plugin_id: String,
+    project_path: String,
+    host: String,
+    deploy_dir: String,
+) -> ApiResponse<devos_core::DeployResult> {
+    let res = (|| -> Result<devos_core::DeployResult> {
+        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let release_dir = root.join("releases");
+        let mut cfg = std::collections::HashMap::new();
+        cfg.insert("host".to_string(), host);
+        cfg.insert("deploy_dir".to_string(), deploy_dir);
+        devos_core::DeployPluginManager::apply_deployment(
+            &plugin_id,
+            &release_dir,
+            &cfg,
+            |_progress| {},
+        )
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn rollback_deployment(
+    plugin_id: String,
+    host: String,
+    version: String,
+) -> ApiResponse<devos_core::DeployResult> {
+    let mut cfg = std::collections::HashMap::new();
+    cfg.insert("host".to_string(), host);
+    let res = devos_core::DeployPluginManager::rollback_deployment(&plugin_id, &version, &cfg);
+    to_api_resp(res)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -797,7 +870,12 @@ pub fn run() {
             restore_vcs_checkpoint,
             get_storage_report,
             clean_storage,
-            trash_project
+            trash_project,
+            list_deploy_plugins,
+            validate_deploy_target,
+            plan_deployment,
+            apply_deployment,
+            rollback_deployment
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

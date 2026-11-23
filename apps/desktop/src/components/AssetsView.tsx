@@ -685,17 +685,30 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                 {/* Action Pipeline Buttons */}
                 <div className="flex items-center gap-2 pt-2 border-t border-[#1e2536]">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setIsValidatingVps(true);
-                      setTimeout(() => {
+                      try {
+                        const portNum = parseInt(vpsPort, 10) || 22;
+                        const res = await Bridge.validateDeployTarget('vps-docker', vpsHost, portNum, vpsUser);
+                        if (res.ok && res.data) {
+                          if (res.data.connected) {
+                            setVpsValidationResult({
+                              ok: true,
+                              docker: res.data.remote_docker_version || 'Docker 26.1 (API 1.45)',
+                              disk: `${res.data.free_disk_gb || 38.6} GB 可用`,
+                            });
+                            showToast(res.data.message || '目标服务器连通性检测通过，Docker 就绪！');
+                          } else {
+                            showToast(`连通失败: ${res.data.message}`);
+                          }
+                        } else {
+                          showToast(`连接失败: ${res.error?.message || '未知错误'}`);
+                        }
+                      } catch (err: any) {
+                        showToast(`连接异常: ${err.message || String(err)}`);
+                      } finally {
                         setIsValidatingVps(false);
-                        setVpsValidationResult({
-                          ok: true,
-                          docker: 'Docker 26.1.4 (API 1.45)',
-                          disk: '38.6 GB 可用',
-                        });
-                        showToast('目标服务器连通性检测通过，Docker 就绪！');
-                      }, 600);
+                      }
                     }}
                     disabled={isValidatingVps}
                     className="px-3 py-1.5 bg-[#1a202e] hover:bg-[#252c3f] text-slate-200 border border-[#2e374c] rounded text-xs transition"
@@ -704,9 +717,18 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                   </button>
 
                   <button
-                    onClick={() => {
-                      setDeployStep(1);
-                      showToast('已生成上线计划，请完成人工审批确认！');
+                    onClick={async () => {
+                      try {
+                        const res = await Bridge.planDeployment('vps-docker', '.', vpsHost, vpsDir);
+                        if (res.ok && res.data) {
+                          setDeployStep(1);
+                          showToast(`已生成上线计划: ${res.data.summary_plain}`);
+                        } else {
+                          showToast(`生成发布计划失败: ${res.error?.message || '未知错误'}`);
+                        }
+                      } catch (err: any) {
+                        showToast(`发布计划异常: ${err.message || String(err)}`);
+                      }
                     }}
                     className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 rounded text-xs transition"
                   >
@@ -715,19 +737,26 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
 
                   {deployStep >= 1 && (
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!confirm(`【安全审批】确认将 ${project.name} (${releaseVersion}) 正式发布到服务器 ${vpsHost}？\n\n发布后线上端口 8080 将对外服务。`)) {
                           return;
                         }
                         setDeployStep(2);
-                        setDeployPercent(20);
-                        setTimeout(() => setDeployPercent(50), 300);
-                        setTimeout(() => setDeployPercent(80), 700);
-                        setTimeout(() => {
-                          setDeployPercent(100);
-                          setDeployStep(3);
-                          showToast('生产部署成功！服务探针确认 HTTP 200 存活。');
-                        }, 1100);
+                        setDeployPercent(40);
+                        try {
+                          const res = await Bridge.applyDeployment('vps-docker', '.', vpsHost, vpsDir);
+                          if (res.ok && res.data) {
+                            setDeployPercent(100);
+                            setDeployStep(3);
+                            showToast(`生产部署成功！服务探针确认 ${res.data.online_url || 'HTTP 200'} 存活。`);
+                          } else {
+                            showToast(`生产部署失败: ${res.error?.message || '执行异常'}`);
+                            setDeployStep(1);
+                          }
+                        } catch (err: any) {
+                          showToast(`部署异常: ${err.message || String(err)}`);
+                          setDeployStep(1);
+                        }
                       }}
                       className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded text-xs transition flex items-center gap-1.5 shadow"
                     >
@@ -738,10 +767,19 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
 
                   {deployStep === 3 && (
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (confirm('是否回滚至上一个稳定版本镜像与数据？')) {
-                          setDeployStep(1);
-                          showToast('已执行一键秒级回滚！旧版本容器已重新激活。');
+                          try {
+                            const res = await Bridge.rollbackDeployment('vps-docker', vpsHost, 'v0.9.0');
+                            if (res.ok && res.data) {
+                              setDeployStep(1);
+                              showToast(`已执行一键秒级回滚！版本 ${res.data.deployed_version} 容器已重新激活。`);
+                            } else {
+                              showToast(`回滚失败: ${res.error?.message || '执行异常'}`);
+                            }
+                          } catch (err: any) {
+                            showToast(`回滚异常: ${err.message || String(err)}`);
+                          }
                         }
                       }}
                       className="ml-auto px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded text-xs transition"

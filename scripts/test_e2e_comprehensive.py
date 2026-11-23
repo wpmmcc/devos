@@ -316,6 +316,36 @@ def test_4_universal_bundle_exporter(proj_dir: Path):
     assert zip_file.exists(), f"Release zip archive must exist at {zip_file}"
     print(f"   ✓ Standard bundle generated with DEPLOY.md, compose, and standalone zip ({zip_file.stat().st_size} bytes)")
 
+    # 5. Test CLI Deploy Plugin Operations (List, Validate, Plan, Apply, Rollback)
+    dep_list_res = run_cmd([str(CLI_BIN), "deploy", "list", "--json"])
+    dep_list_data = json.loads(dep_list_res.stdout)
+    assert dep_list_data["ok"] is True
+    assert len(dep_list_data["data"]) >= 1
+    print(f"   ✓ CLI deploy plugins listed: {len(dep_list_data['data'])} available")
+
+    dep_val_res = run_cmd([str(CLI_BIN), "deploy", "validate", "--host", "127.0.0.1", "--port", "22", "--user", "root", "--json"])
+    dep_val_data = json.loads(dep_val_res.stdout)
+    assert dep_val_data["ok"] is True
+    assert dep_val_data["data"]["connected"] is True
+    print("   ✓ CLI deploy target validation passed")
+
+    dep_plan_res = run_cmd([str(CLI_BIN), "deploy", "plan", "--plugin", "vps-docker", "--host", "192.168.1.100", "--dir", "/opt/apps", "--path", str(proj_dir), "--json"])
+    dep_plan_data = json.loads(dep_plan_res.stdout)
+    assert dep_plan_data["ok"] is True
+    print("   ✓ CLI deploy plan generated")
+
+    dep_apply_res = run_cmd([str(CLI_BIN), "deploy", "apply", "--plugin", "vps-docker", "--host", "192.168.1.100", "--dir", "/opt/apps", "--path", str(proj_dir), "--json"])
+    dep_apply_data = json.loads(dep_apply_res.stdout)
+    assert dep_apply_data["ok"] is True
+    assert dep_apply_data["data"]["online_url"] == "http://192.168.1.100:8080"
+    print("   ✓ CLI deploy apply executed successfully")
+
+    dep_rb_res = run_cmd([str(CLI_BIN), "deploy", "rollback", "--plugin", "vps-docker", "--host", "192.168.1.100", "--version", "v0.9.0", "--json"])
+    dep_rb_data = json.loads(dep_rb_res.stdout)
+    assert dep_rb_data["ok"] is True
+    assert dep_rb_data["data"]["deployed_version"] == "v0.9.0"
+    print("   ✓ CLI deploy rollback executed successfully")
+
 def test_5_desktop_frontend_build():
     log_step("5. Desktop Frontend (Vite + React) Compilation Verification")
     dist_dir = REPO_ROOT / "apps" / "desktop" / "dist"

@@ -198,6 +198,33 @@ export const Bridge = {
 
   trashProject: (projectPath: string) =>
     invokeTauri<string>('trash_project', { projectPath }),
+
+  listDeployPlugins: () =>
+    invokeTauri<any[]>('list_deploy_plugins'),
+
+  validateDeployTarget: (pluginId: string, host: string, port: number, user: string) =>
+    invokeTauri<{ connected: boolean; remote_docker_version?: string; free_disk_gb?: number; message: string }>(
+      'validate_deploy_target',
+      { pluginId, host, port, user }
+    ),
+
+  planDeployment: (pluginId: string, projectPath: string, host: string, deployDir: string) =>
+    invokeTauri<{ plugin_id: string; target_host: string; target_directory: string; summary_plain: string }>(
+      'plan_deployment',
+      { pluginId, projectPath, host, deployDir }
+    ),
+
+  applyDeployment: (pluginId: string, projectPath: string, host: string, deployDir: string) =>
+    invokeTauri<{ ok: boolean; online_url?: string; deployed_version: string; sanitized_log?: string }>(
+      'apply_deployment',
+      { pluginId, projectPath, host, deployDir }
+    ),
+
+  rollbackDeployment: (pluginId: string, host: string, version: string) =>
+    invokeTauri<{ ok: boolean; online_url?: string; deployed_version: string; sanitized_log?: string }>(
+      'rollback_deployment',
+      { pluginId, host, version }
+    ),
 };
 
 // Mock Fallbacks for Browser
@@ -463,6 +490,69 @@ function mockHandler<T>(cmd: string, args: Record<string, any>): ApiResponse<T> 
 
   if (cmd === 'trash_project') {
     return { ok: true, data: '~/.devos/trash/demo' as any };
+  }
+
+  if (cmd === 'list_deploy_plugins') {
+    return {
+      ok: true,
+      data: [
+        {
+          id: 'vps-docker',
+          name: '通用 Linux VPS (SSH + Docker Compose)',
+          version: '1.0.0',
+          description: '面向任意安装了 Docker 的云主机/VPS，通过 SSH 自动化上传交付包、拉起容器编排并实现保留回滚。',
+          plugin_type: 'Recipe',
+        },
+      ] as any,
+    };
+  }
+
+  if (cmd === 'validate_deploy_target') {
+    return {
+      ok: true,
+      data: {
+        connected: true,
+        remote_docker_version: 'Docker 26.1.4 (API 1.45)',
+        free_disk_gb: 38.6,
+        message: '目标主机连通性与 Docker 运行环境检测通过',
+      } as any,
+    };
+  }
+
+  if (cmd === 'plan_deployment') {
+    return {
+      ok: true,
+      data: {
+        plugin_id: args.pluginId || 'vps-docker',
+        target_host: args.host || '127.0.0.1',
+        target_directory: args.deployDir || '/opt/apps',
+        summary_plain: `即将向服务器 ${args.host || '127.0.0.1'} 推送生产镜像构建文件与编排清单，并启动容器`,
+      } as any,
+    };
+  }
+
+  if (cmd === 'apply_deployment') {
+    return {
+      ok: true,
+      data: {
+        ok: true,
+        online_url: `http://${args.host || '127.0.0.1'}:8080`,
+        deployed_version: 'v1.0.0',
+        sanitized_log: 'Deployed successfully via SSH Docker Compose plugin.',
+      } as any,
+    };
+  }
+
+  if (cmd === 'rollback_deployment') {
+    return {
+      ok: true,
+      data: {
+        ok: true,
+        online_url: `http://${args.host || '127.0.0.1'}:8080`,
+        deployed_version: args.version || 'v0.9.0',
+        sanitized_log: `Rolled back to previous version ${args.version || 'v0.9.0'}.`,
+      } as any,
+    };
   }
 
   return { ok: true, data: null as any };

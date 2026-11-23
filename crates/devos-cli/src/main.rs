@@ -165,6 +165,25 @@ enum Commands {
         #[arg(long)]
         path: Option<PathBuf>,
     },
+
+    /// Standardized delivery deployment plugins (VPS Docker Compose, recipes, rollback)
+    Deploy {
+        action: String, // list, validate, plan, apply, rollback
+        #[arg(long, default_value = "vps-docker")]
+        plugin: String,
+        #[arg(long)]
+        host: Option<String>,
+        #[arg(long, default_value = "22")]
+        port: u16,
+        #[arg(long, default_value = "root")]
+        user: String,
+        #[arg(long, default_value = "/opt/apps")]
+        dir: String,
+        #[arg(long)]
+        version: Option<String>,
+        #[arg(long)]
+        path: Option<PathBuf>,
+    },
 }
 
 fn print_result<T: serde::Serialize>(json_mode: bool, res: Result<T>) {
@@ -741,6 +760,96 @@ async fn main() {
                         message: format!("Unknown project action: {}", action),
                         hint: Some("Supported: trash, validate".to_string()),
                         plain_message: Some(format!("未知的项目操作: {}", action)),
+                    }),
+                }
+            })();
+            print_result(json_mode, res);
+        }
+
+        Commands::Deploy {
+            action,
+            plugin,
+            host,
+            port,
+            user,
+            dir,
+            version,
+            path,
+        } => {
+            let res = (|| -> Result<serde_json::Value> {
+                let target_dir = path
+                    .or(cli.project_dir.clone())
+                    .unwrap_or_else(|| PathBuf::from("."));
+                let release_dir = target_dir.join("releases");
+                match action.as_str() {
+                    "list" => {
+                        let plugins = devos_core::DeployPluginManager::list_plugins();
+                        Ok(serde_json::to_value(plugins)?)
+                    }
+                    "validate" => {
+                        let mut cfg = std::collections::HashMap::new();
+                        cfg.insert(
+                            "host".to_string(),
+                            host.unwrap_or_else(|| "127.0.0.1".to_string()),
+                        );
+                        cfg.insert("port".to_string(), port.to_string());
+                        cfg.insert("user".to_string(), user);
+                        let val = devos_core::DeployPluginManager::validate_target(&plugin, &cfg)?;
+                        Ok(serde_json::to_value(val)?)
+                    }
+                    "plan" => {
+                        let mut cfg = std::collections::HashMap::new();
+                        cfg.insert(
+                            "host".to_string(),
+                            host.unwrap_or_else(|| "127.0.0.1".to_string()),
+                        );
+                        cfg.insert("deploy_dir".to_string(), dir);
+                        let plan = devos_core::DeployPluginManager::plan_deployment(
+                            &plugin,
+                            &release_dir,
+                            &cfg,
+                        )?;
+                        Ok(serde_json::to_value(plan)?)
+                    }
+                    "apply" => {
+                        let mut cfg = std::collections::HashMap::new();
+                        cfg.insert(
+                            "host".to_string(),
+                            host.unwrap_or_else(|| "127.0.0.1".to_string()),
+                        );
+                        cfg.insert("deploy_dir".to_string(), dir);
+                        let apply_res = devos_core::DeployPluginManager::apply_deployment(
+                            &plugin,
+                            &release_dir,
+                            &cfg,
+                            |p| {
+                                if !json_mode {
+                                    println!(
+                                        "[DEPLOY {:3}%] [{}] {}",
+                                        p.percent, p.stage_code, p.message_plain
+                                    );
+                                }
+                            },
+                        )?;
+                        Ok(serde_json::to_value(apply_res)?)
+                    }
+                    "rollback" => {
+                        let target_v = version.unwrap_or_else(|| "v1.0.0".to_string());
+                        let mut cfg = std::collections::HashMap::new();
+                        cfg.insert(
+                            "host".to_string(),
+                            host.unwrap_or_else(|| "127.0.0.1".to_string()),
+                        );
+                        let rb = devos_core::DeployPluginManager::rollback_deployment(
+                            &plugin, &target_v, &cfg,
+                        )?;
+                        Ok(serde_json::to_value(rb)?)
+                    }
+                    _ => Err(DevosError::Custom {
+                        code: "UNKNOWN_ACTION".to_string(),
+                        message: format!("Unknown deploy action: {}", action),
+                        hint: Some("Supported: list, validate, plan, apply, rollback".to_string()),
+                        plain_message: Some(format!("未知的部署操作: {}", action)),
                     }),
                 }
             })();
