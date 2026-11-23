@@ -226,6 +226,7 @@ impl ProjectManager {
                                 devos_schema::SourceType::WebPreview => "web_preview",
                                 devos_schema::SourceType::ScriptRun => "script_run",
                                 devos_schema::SourceType::Manual => "manual",
+                                devos_schema::SourceType::DeployFailure => "deploy_failure",
                             };
                             let _ = db.upsert_issue(
                                 &issue.issue_id,

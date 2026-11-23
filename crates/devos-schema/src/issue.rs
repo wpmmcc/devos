@@ -29,6 +29,7 @@ pub enum SourceType {
     WebPreview,
     ScriptRun,
     Manual,
+    DeployFailure,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
@@ -127,6 +128,14 @@ pub struct IssueResolution {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
 #[ts(export)]
+pub struct IssueClaim {
+    pub agent_name: String,
+    pub session_id: String,
+    pub claimed_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+#[ts(export)]
 pub struct RetestRecord {
     pub retested_at: String,
     pub passed: bool,
@@ -152,6 +161,8 @@ pub struct Issue {
     pub resolution: IssueResolution,
     #[serde(default)]
     pub retest_history: Vec<RetestRecord>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claimed_by: Option<IssueClaim>,
 }
 
 impl Issue {
@@ -179,6 +190,7 @@ impl Issue {
             captured_context,
             resolution: IssueResolution::default(),
             retest_history: Vec::new(),
+            claimed_by: None,
         }
     }
 }

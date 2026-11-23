@@ -81,7 +81,13 @@ export interface BoardCard {
 
 export type IssueStatus = 'open' | 'in_progress' | 'ready_for_retest' | 'closed' | 'reopened';
 export type IssueSeverity = 'low' | 'medium' | 'high' | 'critical';
-export type SourceType = 'web_preview' | 'script_run' | 'manual';
+export type SourceType = 'web_preview' | 'script_run' | 'manual' | 'deploy_failure';
+
+export interface IssueClaim {
+  agent_name: string;
+  session_id: string;
+  claimed_at: number;
+}
 
 export interface UserReport {
   title: string;
@@ -149,6 +155,15 @@ export interface Issue {
     passed: boolean;
     feedback_plain: string;
   }>;
+  claimed_by?: IssueClaim;
+}
+
+export interface Checkpoint {
+  id: string;
+  created_at: string;
+  note: string;
+  source: string;
+  commit_ref?: string;
 }
 
 export interface RunInput {

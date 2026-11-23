@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
-import { AlertCircle, CheckCircle2, RefreshCw, ChevronDown, ChevronUp, Check, X, FileCode } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RefreshCw, ChevronDown, ChevronUp, Check, X, FileCode, Copy, Bot } from 'lucide-react';
 import { Issue, IssueStatus } from '../types';
 
 interface IssuesViewProps {
   issues: Issue[];
   onRetest: (issueId: string, passed: boolean, feedback: string) => void;
   onNavigateToTest: () => void;
+  projectName?: string;
+  projectId?: string;
 }
 
 export const IssuesView: React.FC<IssuesViewProps> = ({
   issues,
   onRetest,
   onNavigateToTest,
+  projectName,
+  projectId,
 }) => {
   const [filter, setFilter] = useState<'all' | 'open' | 'ready_for_retest' | 'closed'>('all');
   const [expandedTech, setExpandedTech] = useState<Record<string, boolean>>({});
   const [feedbackInputs, setFeedbackInputs] = useState<Record<string, string>>({});
+
+  const handleCopyInstruction = (iss: Issue) => {
+    const text = `请处理「${projectName || '当前项目'}」(${projectId || 'proj_id'}) 的 ${iss.issue_id}: ${iss.user_report.title}`;
+    navigator.clipboard.writeText(text);
+    alert(`已复制 AI 处理指令（含项目身份指纹，防止跨项目错窗粘贴）：\n\n${text}`);
+  };
 
   const filtered = issues.filter((iss) => {
     if (filter === 'open') return iss.status === 'open' || iss.status === 'reopened' || iss.status === 'in_progress';
@@ -114,12 +124,28 @@ export const IssuesView: React.FC<IssuesViewProps> = ({
                         ? '待我复测 (ready_for_retest)'
                         : '已解决并关闭 (closed)'}
                     </span>
+                    {iss.claimed_by && (
+                      <span className="text-[10px] text-cyan-300 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-700/50 flex items-center gap-1 font-mono">
+                        <Bot size={11} className="text-cyan-400" />
+                        <span>{iss.claimed_by.agent_name} 处理中</span>
+                      </span>
+                    )}
                     <span className="text-[10px] text-slate-500">
                       来源: {iss.source_type === 'web_preview' ? 'Web 页面预览' : '后端脚本运行'}
                     </span>
                   </div>
 
-                  <span className="text-[11px] text-slate-500">{iss.created_at.slice(0, 16).replace('T', ' ')}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCopyInstruction(iss)}
+                      className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/40 hover:bg-cyan-900/40 px-2 py-0.5 rounded border border-cyan-800/40 transition font-medium"
+                      title="复制带项目身份指纹的指令，防止多 Agent 协作时错发窗口"
+                    >
+                      <Copy size={11} />
+                      <span>复制指令给 AI</span>
+                    </button>
+                    <span className="text-[11px] text-slate-500">{iss.created_at.slice(0, 16).replace('T', ' ')}</span>
+                  </div>
                 </div>
 
                 {/* User Report Plain Title & Description */}

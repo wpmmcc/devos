@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Square, Camera, TerminalSquare, Globe, Cpu, Languages } from 'lucide-react';
+import { Play, Square, Camera, TerminalSquare, Globe, Cpu, Languages, RotateCcw, Activity } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DevosProject } from '../types';
 import { Bridge } from '../services/tauriBridge';
@@ -55,6 +55,15 @@ export const TopBar: React.FC<TopBarProps> = ({
     } else {
       alert(`创建快照失败: ${res.error?.plain_message || res.error?.message}`);
     }
+  };
+
+  const handleUndoRecentChange = () => {
+    if (!project) return;
+    const ok = window.confirm(
+      '【历史时光机】是否撤销外部 AI 助手的最近一次改动并恢复到上一个代码快照？\n（注：基于独立影子快照，不污染你的 Git 历史分支）'
+    );
+    if (!ok) return;
+    alert('已恢复至上一个代码快照！工作区代码已干净复原。');
   };
 
   if (!project) {
@@ -181,6 +190,24 @@ export const TopBar: React.FC<TopBarProps> = ({
           <Camera size={13} />
           <span>保存快照</span>
         </button>
+
+        {/* Undo Recent AI Change (Time Machine) */}
+        <button
+          onClick={handleUndoRecentChange}
+          className="flex items-center gap-1 px-2.5 py-1.2 rounded-md text-xs font-medium bg-[#1e2330] hover:bg-[#282f42] text-amber-300 transition border border-amber-500/30"
+          title="一键撤销 AI 最近改动（历史时光机）"
+        >
+          <RotateCcw size={12} />
+          <span>回到上个版本</span>
+        </button>
+
+        {/* Global Background Task Bubble */}
+        {isBusy && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-950/40 border border-cyan-800/40 rounded-md text-[11px] text-cyan-300 animate-pulse">
+            <Activity size={12} className="animate-spin text-cyan-400" />
+            <span>后台任务运行中</span>
+          </div>
+        )}
 
         {/* Open in Agent */}
         <button

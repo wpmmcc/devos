@@ -1,5 +1,6 @@
 pub mod agent_config;
 pub mod board;
+pub mod checkpoint;
 pub mod daemon;
 pub mod db;
 pub mod error;
@@ -15,6 +16,7 @@ pub mod watcher;
 
 pub use agent_config::{AgentConfigManager, AgentDetection};
 pub use board::BoardManager;
+pub use checkpoint::{Checkpoint, CheckpointManager};
 pub use daemon::DaemonManager;
 pub use db::{ActivityEvent, Database};
 pub use error::{DevosError, Result};
@@ -125,5 +127,37 @@ mod tests {
         ).unwrap();
         assert_eq!(resolved.status, devos_schema::IssueStatus::ReadyForRetest);
         assert!(project_dir.join("knowledge/KB-ISS-001.md").exists());
+
+        // 7. Test Claim Lock (Phase 8)
+        let claim_res = IssueManager::claim_issue(
+            &project_dir,
+            &project,
+            "ISS-001",
+            "Claude Code",
+            "sess_12345",
+        ).unwrap();
+        assert_eq!(claim_res.claimed_by.as_ref().unwrap().agent_name, "Claude Code");
+
+        // Concurrent claim by another session should be rejected
+        let conflict_claim = IssueManager::claim_issue(
+            &project_dir,
+            &project,
+            "ISS-001",
+            "Factory Droid",
+            "sess_99999",
+        );
+        assert!(conflict_claim.is_err());
+
+        // 8. Test Checkpoint Manager (Phase 8/10)
+        let cp = CheckpointManager::create_checkpoint(
+            &project_dir,
+            "Initial setup checkpoint",
+            "user_manual",
+        ).unwrap();
+        assert!(cp.id.starts_with("cp_"));
+
+        let checkpoints = CheckpointManager::list_checkpoints(&project_dir).unwrap();
+        assert_eq!(checkpoints.len(), 1);
+        assert_eq!(checkpoints[0].note, "Initial setup checkpoint");
     }
 }

@@ -23,6 +23,8 @@ interface SidebarProps {
   onOpenNewProject: () => void;
   onOpenDoctor: () => void;
   onOpenConflictDoctor?: () => void;
+  runningProjectsCount?: number;
+  onStopAllEnvironments?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -36,6 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenNewProject,
   onOpenDoctor,
   onOpenConflictDoctor,
+  runningProjectsCount,
+  onStopAllEnvironments,
 }) => {
   return (
     <aside className="w-[220px] bg-[#12151d] border-r border-[#1e2330] flex flex-col justify-between shrink-0 h-screen select-none">
@@ -169,6 +173,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Running Environments Resource Capsule */}
+      <div className="px-3 pt-3 border-t border-[#1e2330]">
+        <div className="px-2.5 py-1.5 bg-[#161a25] rounded-lg border border-[#232938] flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 text-slate-300">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                (runningProjectsCount || 0) > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
+              }`}
+            />
+            <span className="text-[11px]">运行中: {runningProjectsCount ?? (currentProject ? 1 : 0)} 个</span>
+          </div>
+          {(runningProjectsCount || 0) > 0 && onStopAllEnvironments && (
+            <button
+              onClick={onStopAllEnvironments}
+              className="text-[10px] text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 px-1.5 py-0.5 rounded border border-rose-500/30 transition font-medium"
+              title="一键停止所有运行中的 Docker 容器，释放电脑算力"
+            >
+              停止全部
+            </button>
+          )}
         </div>
       </div>
 

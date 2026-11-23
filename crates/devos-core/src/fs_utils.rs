@@ -84,10 +84,137 @@ pub fn read_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
     fs::read_to_string(path).map_err(DevosError::Io)
 }
 
-/// Read and deserialize JSON from a file
+/// Strip comments (line and block) and trailing commas from JSONC content
+pub fn clean_jsonc(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let chars: Vec<char> = input.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+    let mut in_string = false;
+    let mut escape = false;
+
+    while i < len {
+        let c = chars[i];
+
+        if in_string {
+            out.push(c);
+            if escape {
+                escape = false;
+            } else if c == '\\' {
+                escape = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+
+        if c == '"' {
+            in_string = true;
+            out.push(c);
+            i += 1;
+            continue;
+        }
+
+        // Line comment //
+        if c == '/' && i + 1 < len && chars[i + 1] == '/' {
+            i += 2;
+            while i < len && chars[i] != '\n' {
+                i += 1;
+            }
+            continue;
+        }
+
+        // Block comment /* */
+        if c == '/' && i + 1 < len && chars[i + 1] == '*' {
+            i += 2;
+            while i + 1 < len && !(chars[i] == '*' && chars[i + 1] == '/') {
+                i += 1;
+            }
+            i += 2; // skip */
+            continue;
+        }
+
+        out.push(c);
+        i += 1;
+    }
+
+    // Now remove trailing commas: comma followed by whitespace and closing '}' or ']'
+    let mut cleaned = String::with_capacity(out.len());
+    let out_chars: Vec<char> = out.chars().collect();
+    let out_len = out_chars.len();
+    let mut j = 0;
+    let mut in_str = false;
+    let mut esc = false;
+
+    while j < out_len {
+        let c = out_chars[j];
+        if in_str {
+            cleaned.push(c);
+            if esc {
+                esc = false;
+            } else if c == '\\' {
+                esc = true;
+            } else if c == '"' {
+                in_str = false;
+            }
+            j += 1;
+            continue;
+        }
+
+        if c == '"' {
+            in_str = true;
+            cleaned.push(c);
+            j += 1;
+            continue;
+        }
+
+        if c == ',' {
+            // Peek forward to see if the next non-whitespace char is '}' or ']'
+            let mut k = j + 1;
+            while k < out_len && out_chars[k].is_whitespace() {
+                k += 1;
+            }
+            if k < out_len && (out_chars[k] == '}' || out_chars[k] == ']') {
+                // Skip the trailing comma!
+                j += 1;
+                continue;
+            }
+        }
+
+        cleaned.push(c);
+        j += 1;
+    }
+
+    cleaned
+}
+
+/// Read and deserialize JSON from a file with forgiving JSONC and trailing comma support
 pub fn read_json<P: AsRef<Path>, T: serde::de::DeserializeOwned>(path: P) -> Result<T> {
-    let content = read_to_string(path)?;
-    serde_json::from_str(&content).map_err(DevosError::Serialization)
+    let p = path.as_ref();
+    let content = read_to_string(p)?;
+    match serde_json::from_str::<T>(&content) {
+        Ok(val) => Ok(val),
+        Err(orig_err) => {
+            // Forgiving fallback: try parsing cleaned JSONC
+            let cleaned = clean_jsonc(&content);
+            if let Ok(val) = serde_json::from_str::<T>(&cleaned) {
+                return Ok(val);
+            }
+
+            // Check if backup file exists
+            let bak_path = p.with_extension("json.bak");
+            if bak_path.exists() {
+                if let Ok(bak_content) = read_to_string(&bak_path) {
+                    if let Ok(val) = serde_json::from_str::<T>(&bak_content) {
+                        return Ok(val);
+                    }
+                }
+            }
+
+            Err(DevosError::Serialization(orig_err))
+        }
+    }
 }
 
 /// Convert any path to relative POSIX style ("dir/sub/file.ext")
@@ -100,23 +227,63 @@ pub fn to_posix_path<P: AsRef<Path>>(path: P) -> String {
     components.join("/")
 }
 
-/// Ensure path is within the project root directory to prevent directory traversal
+/// Ensure path is strictly within the project root directory, preventing directory traversal and symlink escapes
 pub fn ensure_within_root(root: &Path, target: &Path) -> Result<PathBuf> {
     let canonical_root = root.canonicalize().map_err(DevosError::Io)?;
-    let canonical_target = if target.is_relative() {
+    let resolved = if target.is_relative() {
         canonical_root.join(target)
     } else {
         target.to_path_buf()
     };
 
+    // If target exists, canonicalize directly to resolve any symlinks
+    let canonical_target = if resolved.exists() {
+        resolved.canonicalize().map_err(DevosError::Io)?
+    } else if let Some(parent) = resolved.parent() {
+        if parent.exists() {
+            let parent_canonical = parent.canonicalize().map_err(DevosError::Io)?;
+            parent_canonical.join(resolved.file_name().unwrap_or_default())
+        } else {
+            resolved
+        }
+    } else {
+        resolved
+    };
+
     if !canonical_target.starts_with(&canonical_root) {
         return Err(DevosError::GuardrailBlocked {
-            code: "PATH_OUT_OF_BOUNDS".to_string(),
+            code: "GUARDRAIL_PATH_OUT_OF_SANDBOX".to_string(),
             reason: format!("Path {:?} is outside of project root {:?}", target, root),
             hint: "Please ensure the path is relative to the project workspace root.".to_string(),
-            plain_message: "该文件路径超出了项目目录安全范围，已被安全护栏拦截。".to_string(),
+            plain_message: "该文件路径超出了项目目录安全范围（禁止路径穿越或符号链接逃逸）。".to_string(),
         });
     }
 
     Ok(canonical_target)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clean_jsonc_comments_and_trailing_commas() {
+        let raw = r#"{
+            // This is a line comment
+            "name": "devos", /* block comment */
+            "items": [
+                "a",
+                "b", // another comment
+            ],
+            "nested": {
+                "flag": true,
+            },
+        }"#;
+
+        let cleaned = clean_jsonc(raw);
+        let parsed: serde_json::Value = serde_json::from_str(&cleaned).expect("Failed to parse cleaned jsonc");
+        assert_eq!(parsed["name"], "devos");
+        assert_eq!(parsed["items"][0], "a");
+        assert_eq!(parsed["nested"]["flag"], true);
+    }
 }

@@ -1,6 +1,6 @@
 use std::path::Path;
 use devos_schema::{
-    CapturedContext, DevosProject, Issue, IssueResolution, IssueSeverity, IssueStatus,
+    CapturedContext, DevosProject, Issue, IssueClaim, IssueResolution, IssueSeverity, IssueStatus,
     RetestRecord, SourceType, UserReport,
 };
 use crate::error::{DevosError, Result};
@@ -100,6 +100,55 @@ impl IssueManager {
         issue.linked_checklist_step = linked_checklist_step;
 
         let path = issues_dir.join(format!("{}.json", issue_id));
+        atomic_write_json(&path, &issue)?;
+        Ok(issue)
+    }
+
+    /// Claim an issue for exclusive work by an Agent session
+    pub fn claim_issue(
+        root: &Path,
+        project: &DevosProject,
+        issue_id: &str,
+        agent_name: &str,
+        session_id: &str,
+    ) -> Result<Issue> {
+        let issues_dir = root.join(&project.workspace_paths.issues);
+        let path = issues_dir.join(format!("{}.json", issue_id));
+        if !path.exists() {
+            return Err(DevosError::Custom {
+                code: "ISSUE_NOT_FOUND".to_string(),
+                message: format!("Issue {} not found", issue_id),
+                hint: Some("Verify the issue ID exists.".to_string()),
+                plain_message: Some(format!("未找到编号为 {} 的反馈记录", issue_id)),
+            });
+        }
+
+        let mut issue: Issue = read_json(&path)?;
+        let now = chrono::Utc::now().timestamp();
+
+        if let Some(ref claim) = issue.claimed_by {
+            // If claimed by another session and still active within 30 minutes (1800s)
+            if claim.session_id != session_id && (now - claim.claimed_at) < 1800 {
+                return Err(DevosError::Custom {
+                    code: "ISSUE_ALREADY_CLAIMED".to_string(),
+                    message: format!(
+                        "Issue {} is already claimed by {} (session {})",
+                        issue_id, claim.agent_name, claim.session_id
+                    ),
+                    hint: Some("Wait for the other agent to finish or coordinate with user.".to_string()),
+                    plain_message: Some(format!("该问题正由 {} 处理中（30分钟内有效），避免重复处理", claim.agent_name)),
+                });
+            }
+        }
+
+        issue.claimed_by = Some(IssueClaim {
+            agent_name: agent_name.to_string(),
+            session_id: session_id.to_string(),
+            claimed_at: now,
+        });
+        issue.status = IssueStatus::InProgress;
+        issue.updated_at = chrono::Utc::now().to_rfc3339();
+
         atomic_write_json(&path, &issue)?;
         Ok(issue)
     }

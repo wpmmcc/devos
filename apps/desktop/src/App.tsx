@@ -204,6 +204,15 @@ export const App: React.FC = () => {
         onOpenNewProject={() => setIsNewProjectOpen(true)}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onOpenConflictDoctor={() => setIsConflictDoctorOpen(true)}
+        runningProjectsCount={project ? 1 : 0}
+        onStopAllEnvironments={async () => {
+          const ok = window.confirm('是否停止所有正在运行的容器环境？这将彻底释放系统算力与内存。');
+          if (!ok) return;
+          if (project) {
+            await Bridge.stopEnv('.', 'auto');
+          }
+          alert('已向所有受控容器发送停止信号，内存与端口已释放！');
+        }}
       />
 
       {/* Main Container */}
@@ -246,6 +255,8 @@ export const App: React.FC = () => {
                 issues={issues}
                 onRetest={handleRetestIssue}
                 onNavigateToTest={() => setActiveTab('test')}
+                projectName={project.name}
+                projectId={project.project_id}
               />
             )}
 

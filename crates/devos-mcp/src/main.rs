@@ -163,6 +163,30 @@ fn tool_definitions() -> Value {
                 },
                 "required": ["question_plain", "options"]
             }
+        },
+        {
+            "name": "claim_issue",
+            "description": "独占认领一个待处理的 Issue，记录认领人和会话 ID，防止多 Agent 协作时重复处理或代码冲突。",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "issue_id": { "type": "string", "description": "要认领的 Issue 编号，如 ISS-001" },
+                    "agent_name": { "type": "string", "description": "认领此 Issue 的 Agent 名称，如 Claude Code / Factory Droid" }
+                },
+                "required": ["issue_id"]
+            }
+        },
+        {
+            "name": "vcs_checkpoint",
+            "description": "在进行代码或结构变更前创建轻量代码时光机快照（不污染 Git 历史），或查询当前快照列表。",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": { "type": "string", "enum": ["status", "create"], "description": "status 查询快照列表，create 创建新快照" },
+                    "note": { "type": "string", "description": "快照说明备忘，如 '重构数据模型前快照'" }
+                },
+                "required": ["action"]
+            }
         }
     ])
 }
@@ -170,6 +194,35 @@ fn tool_definitions() -> Value {
 fn execute_tool(name: &str, arguments: &Value) -> Value {
     let res: Result<Value> = (|| {
         let (root, project) = get_project_context()?;
+
+        // Context mismatch safeguard (GATE_CONTEXT_MISMATCH)
+        if let Some(target_proj_id) = arguments.get("project_id").and_then(|v| v.as_str()) {
+            if !target_proj_id.is_empty() && target_proj_id != project.project_id {
+                return Err(DevosError::Custom {
+                    code: "GATE_CONTEXT_MISMATCH".to_string(),
+                    message: format!(
+                        "当前窗口绑定的是「{}」({})，但你请求操作的目标项目是「{}」，请提示用户切换到正确窗口",
+                        project.name, project.project_id, target_proj_id
+                    ),
+                    hint: Some("Switch terminal to the target project directory.".to_string()),
+                    plain_message: Some(format!("窗口上下文不匹配：当前窗口属于「{}」，无法执行针对「{}」的操作", project.name, target_proj_id)),
+                });
+            }
+        }
+        if let Some(target_proj_name) = arguments.get("project_name").and_then(|v| v.as_str()) {
+            if !target_proj_name.is_empty() && target_proj_name != project.name {
+                return Err(DevosError::Custom {
+                    code: "GATE_CONTEXT_MISMATCH".to_string(),
+                    message: format!(
+                        "当前窗口绑定的是「{}」({})，但你要处理的任务属于「{}」，请提示用户切换到正确窗口",
+                        project.name, project.project_id, target_proj_name
+                    ),
+                    hint: Some("Switch terminal to the target project directory.".to_string()),
+                    plain_message: Some(format!("窗口上下文不匹配：当前窗口属于「{}」，无法执行针对「{}」的操作", project.name, target_proj_name)),
+                });
+            }
+        }
+
         match name {
             "get_project_brief" => {
                 let include_standards = arguments["include_standards"].as_bool().unwrap_or(true);
@@ -366,8 +419,44 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                     format!("{}_{}", asset_type, uuid::Uuid::new_v4().simple())
                 });
                 let file_path = root.join(subfolder).join(format!("{}.md", id));
+                // Sandboxed path validation to prevent symlink/path traversal escapes
+                devos_core::ensure_within_root(&root, &file_path)?;
                 devos_core::atomic_write(&file_path, format!("# {}\n\n{}", title, content))?;
                 Ok(json!({ "saved": true, "path": file_path.display().to_string() }))
+            }
+
+            "claim_issue" => {
+                let issue_id = arguments["issue_id"].as_str().ok_or_else(|| DevosError::Custom {
+                    code: "MISSING_ISSUE_ID".to_string(),
+                    message: "issue_id is required".to_string(),
+                    hint: None,
+                    plain_message: None,
+                })?;
+                let agent_name = arguments["agent_name"].as_str().unwrap_or("External Agent");
+                let session_id = std::env::var("DEVOS_SESSION_ID").unwrap_or_else(|_| "default_session".to_string());
+                let issue = IssueManager::claim_issue(&root, &project, issue_id, agent_name, &session_id)?;
+                Ok(serde_json::to_value(issue)?)
+            }
+
+            "vcs_checkpoint" => {
+                let action = arguments["action"].as_str().unwrap_or("status");
+                match action {
+                    "status" => {
+                        let list = devos_core::CheckpointManager::list_checkpoints(&root)?;
+                        Ok(json!({ "checkpoints": list }))
+                    }
+                    "create" => {
+                        let note = arguments["note"].as_str().unwrap_or("Agent checkpoint before modification");
+                        let cp = devos_core::CheckpointManager::create_checkpoint(&root, note, "agent_auto")?;
+                        Ok(serde_json::to_value(cp)?)
+                    }
+                    _ => Err(DevosError::Custom {
+                        code: "UNKNOWN_ACTION".to_string(),
+                        message: format!("Unknown checkpoint action: {}", action),
+                        hint: None,
+                        plain_message: None,
+                    }),
+                }
             }
 
             "request_user_decision" => {
@@ -423,7 +512,7 @@ async fn main() -> io::Result<()> {
             "name": "devos-mcp",
             "version": env!("CARGO_PKG_VERSION"),
             "protocolVersion": "2024-11-05",
-            "tools_count": 8,
+            "tools_count": 10,
             "executable_ok": true
         });
         println!("{}", serde_json::to_string_pretty(&check_result).unwrap());

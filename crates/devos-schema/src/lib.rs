@@ -12,7 +12,7 @@ pub use board::{BoardCard, BoardColumn, ChecklistStep};
 pub use daemon::DaemonInfo;
 pub use decision::{DecisionOption, DecisionRequest};
 pub use issue::{
-    AnnotatedRegion, CapturedContext, ConsoleErrorRecord, FailedRequestRecord, Issue,
+    AnnotatedRegion, CapturedContext, ConsoleErrorRecord, FailedRequestRecord, Issue, IssueClaim,
     IssueResolution, IssueSeverity, IssueStatus, RetestRecord, ScriptContext, SourceType,
     UserReport, WebContext,
 };
