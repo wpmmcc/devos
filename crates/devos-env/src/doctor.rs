@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process::Command;
 use crate::driver::{DiagnosticItem, DiagnosticStatus};
 
@@ -13,6 +14,83 @@ impl PreflightDoctor {
         #[cfg(target_os = "windows")]
         results.push(Self::check_wsl());
         results
+    }
+
+    pub fn auto_fix_all() -> Vec<DiagnosticItem> {
+        let devc_check = Self::check_devcontainer();
+        if devc_check.status != DiagnosticStatus::Ok {
+            let _ = Self::auto_fix_devcontainer();
+        }
+        Self::diagnose_all()
+    }
+
+    pub fn auto_fix_devcontainer() -> Result<String, String> {
+        // 1. Try pnpm
+        if let Ok(out) = Command::new("pnpm").args(["add", "-g", "@devcontainers/cli"]).output() {
+            if out.status.success() {
+                return Ok("通过 pnpm 自动安装 @devcontainers/cli 成功".to_string());
+            }
+        }
+
+        // 2. Try npm
+        if let Ok(out) = Command::new("npm").args(["install", "-g", "@devcontainers/cli"]).output() {
+            if out.status.success() {
+                return Ok("通过 npm 自动安装 @devcontainers/cli 成功".to_string());
+            }
+        }
+
+        // 3. Try local install into ~/.devos/bin
+        if let Some(home) = dirs::home_dir() {
+            let bin_dir = home.join(".devos").join("bin");
+            let _ = std::fs::create_dir_all(&bin_dir);
+            if let Ok(out) = Command::new("npm")
+                .args(["install", "--prefix", bin_dir.to_str().unwrap_or(""), "@devcontainers/cli"])
+                .output()
+            {
+                if out.status.success() {
+                    return Ok("已将 @devcontainers/cli 安全安装至 DevOS 私有托管目录 (~/.devos/bin/)".to_string());
+                }
+            }
+        }
+
+        Err("未检测到可用的 npm 或 pnpm 包管理器，无法自动拉取 @devcontainers/cli，请先安装 Node.js 环境。".to_string())
+    }
+
+    pub fn get_devcontainer_binary() -> Option<PathBuf> {
+        // 1. Check ~/.devos/bin
+        if let Some(home) = dirs::home_dir() {
+            let bin = home.join(".devos").join("bin").join("devcontainer");
+            if bin.exists() {
+                return Some(bin);
+            }
+            #[cfg(target_os = "windows")]
+            {
+                let bin_cmd = home.join(".devos").join("bin").join("devcontainer.cmd");
+                if bin_cmd.exists() {
+                    return Some(bin_cmd);
+                }
+            }
+        }
+
+        // 2. Check devcontainer in PATH (Windows cmd or Unix)
+        #[cfg(target_os = "windows")]
+        let candidate = "devcontainer.cmd";
+        #[cfg(not(target_os = "windows"))]
+        let candidate = "devcontainer";
+
+        if let Ok(out) = Command::new(candidate).arg("--version").output() {
+            if out.status.success() {
+                return Some(PathBuf::from(candidate));
+            }
+        }
+
+        if let Ok(out) = Command::new("devcontainer").arg("--version").output() {
+            if out.status.success() {
+                return Some(PathBuf::from("devcontainer"));
+            }
+        }
+
+        None
     }
 
     pub fn check_proxy_bypass() -> DiagnosticItem {
@@ -71,6 +149,26 @@ impl PreflightDoctor {
     }
 
     pub fn check_ddev() -> DiagnosticItem {
+        // 1. Check ~/.devos/bin/ddev
+        if let Some(home) = dirs::home_dir() {
+            let bin = home.join(".devos").join("bin").join("ddev");
+            if bin.exists() {
+                if let Ok(out) = Command::new(&bin).arg("--version").output() {
+                    if out.status.success() {
+                        let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                        return DiagnosticItem {
+                            key: "ddev".to_string(),
+                            title: "DDEV 网页与数据库环境引擎".to_string(),
+                            status: DiagnosticStatus::Ok,
+                            message: format!("已就绪 (DevOS 托管): {}", ver),
+                            fix_hint: None,
+                        };
+                    }
+                }
+            }
+        }
+
+        // 2. Check PATH
         match Command::new("ddev").arg("--version").output() {
             Ok(out) if out.status.success() => {
                 let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -87,30 +185,48 @@ impl PreflightDoctor {
                 title: "DDEV 网页与数据库环境引擎".to_string(),
                 status: DiagnosticStatus::Warning,
                 message: "未检测到 DDEV 命令".to_string(),
-                fix_hint: Some("macOS 可执行 `brew install ddev/ddev/ddev` 安装；Windows 可通过 WSL2 或安装包安装。".to_string()),
+                fix_hint: Some("macOS 可执行 `brew install ddev/ddev/ddev` 安装；Windows 可通过 WSL2 或官方安装包安装。".to_string()),
             },
         }
     }
 
     pub fn check_devcontainer() -> DiagnosticItem {
-        match Command::new("devcontainer").arg("--version").output() {
-            Ok(out) if out.status.success() => {
+        // 1. Check direct or managed binary
+        if let Some(bin) = Self::get_devcontainer_binary() {
+            if let Ok(out) = Command::new(&bin).arg("--version").output() {
+                if out.status.success() {
+                    let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    return DiagnosticItem {
+                        key: "devcontainer".to_string(),
+                        title: "Dev Container 后端脚本引擎".to_string(),
+                        status: DiagnosticStatus::Ok,
+                        message: format!("已就绪: {}", ver),
+                        fix_hint: None,
+                    };
+                }
+            }
+        }
+
+        // 2. Check if npx can run it
+        if let Ok(out) = Command::new("npx").args(["--no-install", "@devcontainers/cli", "--version"]).output() {
+            if out.status.success() {
                 let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                DiagnosticItem {
+                return DiagnosticItem {
                     key: "devcontainer".to_string(),
                     title: "Dev Container 后端脚本引擎".to_string(),
                     status: DiagnosticStatus::Ok,
-                    message: format!("已安装: {}", ver),
+                    message: format!("已就绪 (通过 npx): {}", ver),
                     fix_hint: None,
-                }
+                };
             }
-            _ => DiagnosticItem {
-                key: "devcontainer".to_string(),
-                title: "Dev Container 后端脚本引擎".to_string(),
-                status: DiagnosticStatus::Warning,
-                message: "未检测到 @devcontainers/cli 命令".to_string(),
-                fix_hint: Some("可通过执行 `npm install -g @devcontainers/cli` 或 `pnpm add -g @devcontainers/cli` 安装。".to_string()),
-            },
+        }
+
+        DiagnosticItem {
+            key: "devcontainer".to_string(),
+            title: "Dev Container 后端脚本引擎".to_string(),
+            status: DiagnosticStatus::Warning,
+            message: "未检测到 @devcontainers/cli 命令".to_string(),
+            fix_hint: Some("可点击「一键环境自愈」自动安装，或执行 `pnpm add -g @devcontainers/cli`。".to_string()),
         }
     }
 

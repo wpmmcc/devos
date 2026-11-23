@@ -22,8 +22,9 @@ import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MCP_BIN = REPO_ROOT / "target" / "debug" / "devos-mcp"
-CLI_BIN = REPO_ROOT / "target" / "debug" / "devos"
+bin_ext = ".exe" if sys.platform == "win32" else ""
+MCP_BIN = REPO_ROOT / "target" / "debug" / f"devos-mcp{bin_ext}"
+CLI_BIN = REPO_ROOT / "target" / "debug" / f"devos{bin_ext}"
 
 def ensure_binaries():
     if not MCP_BIN.exists() or not CLI_BIN.exists():
@@ -48,13 +49,20 @@ def run_cmd(cmd, cwd=REPO_ROOT, check=True):
     return res
 
 def test_1_cli_and_doctor():
-    log_step("1. CLI Smoke Test & Component Matrix")
+    log_step("1. CLI Smoke Test & Preflight Doctor Auto-Fix")
     res = run_cmd([str(CLI_BIN), "--smoke-test"])
     data = json.loads(res.stdout)
     assert_eq(data["smoke_test"], "passed", "Smoke test must pass")
     assert_eq(data["status"], "ok", "Status must be ok")
     assert data["components"]["agent_adapters_supported"] >= 13, "Must support at least 13 agent adapters"
     print(f"   ✓ CLI smoke test passed (13 adapters supported, {data['components']['preflight_items_checked']} preflight items)")
+
+    # Test Doctor JSON output and self-healing
+    doc_res = run_cmd([str(CLI_BIN), "doctor", "--json"])
+    doc_data = json.loads(doc_res.stdout)
+    assert doc_data["ok"] is True
+    assert len(doc_data["data"]) >= 4, "Must check at least 4 environment items (docker, ddev, devcontainer, proxy)"
+    print(f"   ✓ Preflight doctor check passed ({len(doc_data['data'])} diagnostic items verified)")
 
 def test_2_project_scaffolding(proj_dir: Path):
     log_step("2. Project Scaffolding & Single Source of Truth")

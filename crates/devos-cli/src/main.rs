@@ -103,7 +103,13 @@ enum Commands {
     },
 
     /// Preflight environment doctor check
-    Doctor,
+    Doctor {
+        #[arg(long, help = "Automatically fix and self-heal missing environment dependencies")]
+        fix: bool,
+    },
+
+    /// Automatically setup and self-heal all environment dependencies
+    Setup,
 
     /// Manage AI agent MCP connection configs (Claude Desktop, Cursor, Factory Droid, etc.)
     AgentConfig {
@@ -544,8 +550,17 @@ async fn main() {
             print_result(json_mode, res);
         }
 
-        Commands::Doctor => {
-            let diags = PreflightDoctor::diagnose_all();
+        Commands::Doctor { fix } => {
+            let diags = if fix {
+                PreflightDoctor::auto_fix_all()
+            } else {
+                PreflightDoctor::diagnose_all()
+            };
+            print_result(json_mode, Ok(diags));
+        }
+
+        Commands::Setup => {
+            let diags = PreflightDoctor::auto_fix_all();
             print_result(json_mode, Ok(diags));
         }
 

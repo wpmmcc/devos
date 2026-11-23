@@ -32,6 +32,7 @@ async function invokeTauri<T>(cmd: string, args: Record<string, any> = {}): Prom
 
 export const Bridge = {
   runDoctor: () => invokeTauri<DiagnosticItem[]>('run_preflight_doctor'),
+  autoFixEnvironment: () => invokeTauri<DiagnosticItem[]>('auto_fix_environment'),
 
   getRecentProjects: () => invokeTauri<Array<{ path: string; name: string; project_type: string }>>('get_recent_projects'),
 
@@ -179,7 +180,20 @@ function mockHandler<T>(cmd: string, args: Record<string, any>): ApiResponse<T> 
       data: [
         { key: 'docker', title: 'Docker 容器引擎', status: 'ok', message: 'Docker Desktop / OrbStack 运行中' },
         { key: 'ddev', title: 'DDEV 网页与数据库环境', status: 'ok', message: '已安装 v1.25.5' },
-        { key: 'devcontainer', title: 'Dev Container 脚本环境', status: 'warning', message: '未检测到 @devcontainers/cli 命令', fix_hint: '可在终端执行 npm i -g @devcontainers/cli' },
+        { key: 'devcontainer', title: 'Dev Container 脚本环境', status: 'ok', message: '已安装 0.91.0' },
+        { key: 'proxy', title: '本地网络代理环境', status: 'ok', message: '未检测到代理劫持风险，本地直连正常' },
+      ] as any,
+    };
+  }
+
+  if (cmd === 'auto_fix_environment') {
+    return {
+      ok: true,
+      data: [
+        { key: 'docker', title: 'Docker 容器引擎', status: 'ok', message: 'Docker Desktop / OrbStack 运行中' },
+        { key: 'ddev', title: 'DDEV 网页与数据库环境', status: 'ok', message: '已安装 v1.25.5' },
+        { key: 'devcontainer', title: 'Dev Container 脚本环境', status: 'ok', message: '已自动安装并就绪: 0.91.0' },
+        { key: 'proxy', title: '本地网络代理环境', status: 'ok', message: '未检测到代理劫持风险，本地直连正常' },
       ] as any,
     };
   }

@@ -33,6 +33,11 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Run Cargo Check
         run: cargo check --workspace
 
@@ -42,10 +47,12 @@ jobs:
       - name: Run CLI Headless Smoke Test
         run: cargo run -p devos-cli -- --smoke-test
 
+      - name: Run CLI Preflight Doctor Check
+        run: cargo run -p devos-cli -- doctor --json
+
       - name: Run Comprehensive E2E Simulation Test
-        if: runner.os != 'Windows'
         run: |
-          python3 scripts/test_e2e_comprehensive.py
+          python scripts/test_e2e_comprehensive.py
 
   test-frontend:
     name: Frontend Build & Typecheck

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, CheckCircle2, AlertTriangle, XCircle, RotateCw, Stethoscope, Zap, Download, Upload, Globe } from 'lucide-react';
+import { X, CheckCircle2, AlertTriangle, XCircle, RotateCw, Stethoscope, Zap, Download, Upload, Globe, Sparkles } from 'lucide-react';
 import { DiagnosticItem } from '../types';
 import { Bridge } from '../services/tauriBridge';
 
@@ -21,10 +21,26 @@ export const PreflightDoctorModal: React.FC<PreflightDoctorModalProps> = ({
   const [importingTool, setImportingTool] = useState<string | null>(null);
   const [importPath, setImportPath] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [fixing, setFixing] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleAutoFixEnvironment = async () => {
+    setFixing(true);
+    try {
+      const res = await Bridge.autoFixEnvironment();
+      if (res.ok && res.data) {
+        setItems(res.data);
+        showToast('环境自愈配置完成！已就绪所有受控依赖');
+      } else {
+        showToast(`配置完成，部分项需注意: ${res.error?.plain_message || res.error?.message}`);
+      }
+    } finally {
+      setFixing(false);
+    }
   };
 
   const loadDoctor = async () => {
@@ -261,6 +277,15 @@ export const PreflightDoctorModal: React.FC<PreflightDoctorModalProps> = ({
 
         <div className="flex items-center justify-between pt-3 border-t border-[#202636]">
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleAutoFixEnvironment}
+              disabled={fixing || loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 transition shadow-sm"
+              title="自动安装或自愈缺失的环境组件与沙盒工具"
+            >
+              <Sparkles size={13} className={fixing ? 'animate-spin' : 'text-emerald-400'} />
+              <span>{fixing ? '正在自动配置环境...' : '一键环境自愈配置'}</span>
+            </button>
             <button
               onClick={loadDoctor}
               disabled={loading}

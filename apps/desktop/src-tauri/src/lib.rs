@@ -46,6 +46,12 @@ fn run_preflight_doctor() -> ApiResponse<Vec<DiagnosticItem>> {
 }
 
 #[tauri::command]
+fn auto_fix_environment() -> ApiResponse<Vec<DiagnosticItem>> {
+    let diags = PreflightDoctor::auto_fix_all();
+    ApiResponse::success(diags)
+}
+
+#[tauri::command]
 fn get_recent_projects() -> ApiResponse<Vec<RecentProjectDto>> {
     let res = (|| -> Result<Vec<RecentProjectDto>> {
         let db = Database::open_global()?;
@@ -657,6 +663,7 @@ pub fn run() {
         .manage(ActiveEnvLocks(Mutex::new(HashSet::new())))
         .invoke_handler(tauri::generate_handler![
             run_preflight_doctor,
+            auto_fix_environment,
             get_recent_projects,
             init_project,
             load_project,

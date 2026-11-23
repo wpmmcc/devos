@@ -5,6 +5,14 @@ use devos_core::{inject_proxy_bypass_env, DevosError, Result};
 use crate::doctor::PreflightDoctor;
 use crate::driver::{DiagnosticItem, EnvDriver, EnvStatus, ExecResult};
 
+fn get_dc_command() -> Command {
+    if let Some(bin) = PreflightDoctor::get_devcontainer_binary() {
+        Command::new(bin)
+    } else {
+        Command::new("devcontainer")
+    }
+}
+
 pub struct DevcontainerDriver;
 
 impl DevcontainerDriver {
@@ -27,7 +35,7 @@ impl EnvDriver for DevcontainerDriver {
     }
 
     fn up(&self, project_root: &Path) -> Result<EnvStatus> {
-        let mut cmd = Command::new("devcontainer");
+        let mut cmd = get_dc_command();
         cmd.arg("up").arg("--workspace-folder").arg(project_root);
         inject_proxy_bypass_env(&mut cmd);
 
@@ -119,7 +127,7 @@ impl EnvDriver for DevcontainerDriver {
         _env_vars: &[(&str, &str)],
     ) -> Result<ExecResult> {
         let start = Instant::now();
-        let mut dc_cmd = Command::new("devcontainer");
+        let mut dc_cmd = get_dc_command();
         dc_cmd
             .arg("exec")
             .arg("--workspace-folder")
