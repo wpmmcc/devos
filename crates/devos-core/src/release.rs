@@ -20,6 +20,8 @@ pub struct ReleaseManifest {
     pub target_type: String,
     pub panel_friendly_format: bool,
     pub checksum_sha256: HashMap<String, String>,
+    #[serde(default)]
+    pub preflight_gates: Vec<PreflightGateResult>,
     pub health_check: Option<ReleaseHealthCheck>,
     pub env_variables_schema: Vec<EnvVarSchema>,
 }
@@ -411,6 +413,7 @@ node_modules
             target_type: format!("{:?}", project.project_type).to_lowercase(),
             panel_friendly_format: panel_friendly,
             checksum_sha256: checksums,
+            preflight_gates: gates.clone(),
             health_check: Some(ReleaseHealthCheck {
                 path: "/health".to_string(),
                 expect_status: 200,

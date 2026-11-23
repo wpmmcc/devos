@@ -65,7 +65,7 @@ enum Commands {
     /// Lightweight 4-column Board management
     Board {
         action: String, // list, get, upsert
-        #[arg(long)]
+        #[arg(long, visible_alias = "card", alias = "card")]
         card_id: Option<String>,
         #[arg(long)]
         title: Option<String>,
@@ -80,7 +80,7 @@ enum Commands {
     /// Standardized testing submission gate
     Test {
         action: String, // submit, smoke
-        #[arg(long)]
+        #[arg(long, visible_alias = "card", alias = "card")]
         card_id: Option<String>,
         #[arg(long)]
         summary: Option<String>,
