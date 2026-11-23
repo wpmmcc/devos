@@ -3,6 +3,7 @@ pub mod board;
 pub mod checkpoint;
 pub mod daemon;
 pub mod db;
+pub mod deploy_plugin;
 pub mod error;
 pub mod fs_utils;
 pub mod guardrail;
@@ -12,6 +13,7 @@ pub mod mirror;
 pub mod port;
 pub mod process_env;
 pub mod project;
+pub mod release;
 pub mod watcher;
 
 pub use agent_config::{AgentConfigManager, AgentDetection};
@@ -19,6 +21,7 @@ pub use board::BoardManager;
 pub use checkpoint::{Checkpoint, CheckpointManager};
 pub use daemon::DaemonManager;
 pub use db::{ActivityEvent, Database};
+pub use deploy_plugin::{DeployPlan, DeployPluginManager, DeployPluginMetadata, DeployProgressEvent, DeployResult, ValidationResult};
 pub use error::{DevosError, Result};
 pub use fs_utils::{atomic_write, atomic_write_json, ensure_within_root, read_json, read_to_string, to_posix_path};
 pub use guardrail::Guardrails;
@@ -28,6 +31,7 @@ pub use mirror::{DownloadProgress, MirrorManager, MirrorPreset, MirrorRaceResult
 pub use port::{PortAllocation, PortOccupant, PortRegistry};
 pub use process_env::{diagnose_proxy_env, get_devos_bin_dir, inject_proxy_bypass_env, ProxyDiagnosticInfo, DEFAULT_NO_PROXY};
 pub use project::{ProjectManager, DEVOS_MANAGED_LABEL};
+pub use release::{PreflightGateResult, ReleaseBuildResult, ReleaseHealthCheck, ReleaseManager, ReleaseManifest};
 pub use watcher::{ProjectChangeEvent, ProjectWatcher};
 
 #[cfg(test)]
@@ -159,5 +163,28 @@ mod tests {
         let checkpoints = CheckpointManager::list_checkpoints(&project_dir).unwrap();
         assert_eq!(checkpoints.len(), 1);
         assert_eq!(checkpoints[0].note, "Initial setup checkpoint");
+
+        // 9. Test Release Manager (Phase 9)
+        let release_res = ReleaseManager::prepare_release_artifacts(
+            &project_dir,
+            &project,
+            "1.0.0",
+            true,
+        ).unwrap();
+        assert_eq!(release_res.version, "v1.0.0");
+        assert!(project_dir.join("releases/v1.0.0/release-manifest.json").exists());
+        assert!(project_dir.join("releases/v1.0.0/DEPLOY.md").exists());
+        assert!(project_dir.join("releases/v1.0.0/deploy/docker-compose.prod.yml").exists());
+
+        // 10. Test Deploy Plugin Manager (Phase 9)
+        let plugins = DeployPluginManager::list_plugins();
+        assert!(!plugins.is_empty());
+        assert_eq!(plugins[0].id, "vps-docker");
+
+        let mut config = std::collections::HashMap::new();
+        config.insert("host".to_string(), "127.0.0.1".to_string());
+        config.insert("port".to_string(), "22".to_string());
+        let val = DeployPluginManager::validate_target("vps-docker", &config).unwrap();
+        assert!(val.connected);
     }
 }
