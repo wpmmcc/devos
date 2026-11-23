@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Clock, PlayCircle, ArrowRight, ListChecks, Plus, X, User, Bot, CheckSquare, Square } from 'lucide-react';
+import {
+  CheckCircle2,
+  ArrowRight,
+  ListChecks,
+  X,
+  User,
+  Bot,
+} from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { BoardCard, BoardColumn } from '../types';
 
 interface BoardViewProps {
@@ -8,24 +16,25 @@ interface BoardViewProps {
   onOpenTest: (cardId: string) => void;
 }
 
-const COLUMNS: { id: BoardColumn; title: string; countColor: string }[] = [
-  { id: 'todo', title: '待开发', countColor: 'text-slate-400 bg-slate-800' },
-  { id: 'doing', title: '开发中', countColor: 'text-blue-400 bg-blue-900/40' },
-  { id: 'testing', title: '待我测试', countColor: 'text-amber-400 bg-amber-900/40' },
-  { id: 'done', title: '已完成', countColor: 'text-emerald-400 bg-emerald-900/40' },
-];
-
 export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenTest }) => {
+  const { t } = useTranslation();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+
+  const columns: { id: BoardColumn; title: string; countColor: string }[] = [
+    { id: 'todo', title: t('board.todo'), countColor: 'text-slate-400 bg-slate-800' },
+    { id: 'doing', title: t('board.doing'), countColor: 'text-blue-400 bg-blue-900/40' },
+    { id: 'testing', title: t('board.testing'), countColor: 'text-amber-400 bg-amber-900/40' },
+    { id: 'done', title: t('board.done'), countColor: 'text-emerald-400 bg-emerald-900/40' },
+  ];
 
   const selectedCard = cards.find((c) => c.card_id === selectedCardId);
 
   return (
-    <div className="flex-1 flex overflow-hidden bg-[#0b0d13] relative">
+    <div className="flex-1 flex overflow-hidden bg-[#0b0d13] relative select-none">
       {/* 4-Column Board Canvas */}
       <div className="flex-1 p-6 overflow-x-auto">
         <div className="flex gap-4 h-full min-w-[920px]">
-          {COLUMNS.map((col) => {
+          {columns.map((col) => {
             const colCards = cards.filter((c) => c.column === col.id);
 
             return (
@@ -73,7 +82,7 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
                             ) : (
                               <User size={11} className="text-slate-400" />
                             )}
-                            <span>由 {card.updated_by === 'agent' ? 'AI 助手' : '用户'} 推进</span>
+                            <span>{card.updated_by === 'agent' ? t('board.movedByAi') : t('board.movedByUser')}</span>
                           </span>
                         </div>
 
@@ -93,10 +102,10 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
                           >
                             <span className="flex items-center gap-1.5 font-medium">
                               <ListChecks size={13} />
-                              <span>白话验收清单 ({checklistDone}/{checklistTotal})</span>
+                              <span>{t('board.checklistProgress', { done: checklistDone, total: checklistTotal })}</span>
                             </span>
                             <span className="text-[10px] font-semibold text-amber-400 flex items-center gap-0.5">
-                              去测试 <ArrowRight size={11} />
+                              {t('board.goToTest')} <ArrowRight size={11} />
                             </span>
                           </div>
                         )}
@@ -111,7 +120,7 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
                               }}
                               className="hover:text-blue-400 flex items-center gap-1 transition"
                             >
-                              <span>开始开发</span>
+                              <span>{t('board.startDev')}</span>
                               <ArrowRight size={11} />
                             </button>
                           )}
@@ -124,7 +133,7 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
                               }}
                               className="hover:text-amber-400 flex items-center gap-1 transition text-amber-400 font-medium"
                             >
-                              <span>提交提测单</span>
+                              <span>{t('board.submitTest')}</span>
                               <ArrowRight size={11} />
                             </button>
                           )}
@@ -138,14 +147,14 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
                               className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition font-medium"
                             >
                               <CheckCircle2 size={12} />
-                              <span>确认完成</span>
+                              <span>{t('board.confirmDone')}</span>
                             </button>
                           )}
 
                           {col.id === 'done' && (
                             <span className="text-emerald-400/80 flex items-center gap-1">
                               <CheckCircle2 size={12} />
-                              <span>已验收通过</span>
+                              <span>{t('board.accepted')}</span>
                             </span>
                           )}
                         </div>
@@ -155,7 +164,7 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
 
                   {colCards.length === 0 && (
                     <div className="h-28 border border-dashed border-[#1e2330] rounded-lg flex items-center justify-center text-slate-600 text-xs">
-                      暂无卡片
+                      {t('board.emptyCards')}
                     </div>
                   )}
                 </div>
@@ -173,7 +182,7 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
               <span className="font-mono text-xs text-amber-400 font-bold">
                 {selectedCard.card_id}
               </span>
-              <span className="text-xs font-semibold text-slate-200">卡片详情</span>
+              <span className="text-xs font-semibold text-slate-200">{t('board.cardDetails')}</span>
             </div>
             <button
               onClick={() => setSelectedCardId(null)}
@@ -190,19 +199,19 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
               </h3>
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-[10px] px-2 py-0.5 rounded bg-[#1e2433] text-slate-300 border border-[#2a3245]">
-                  当前列: {COLUMNS.find((c) => c.id === selectedCard.column)?.title}
+                  {t('board.currentCol')}: {columns.find((c) => c.id === selectedCard.column)?.title}
                 </span>
                 <span className="text-[10px] text-slate-500">
-                  最后更新: {new Date(selectedCard.updated_at).toLocaleTimeString()}
+                  {t('board.lastUpdated')}: {new Date(selectedCard.updated_at).toLocaleTimeString()}
                 </span>
               </div>
             </div>
 
             {/* Quick Column Switch */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-slate-400">流转看板状态</label>
+              <label className="text-[11px] font-medium text-slate-400">{t('board.moveStatus')}</label>
               <div className="grid grid-cols-4 gap-1.5">
-                {COLUMNS.map((col) => (
+                {columns.map((col) => (
                   <button
                     key={col.id}
                     onClick={() => onMoveCard(selectedCard.card_id, col.id)}
@@ -220,9 +229,9 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
 
             {/* Summary */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-medium text-slate-400">进展摘要与说明</label>
+              <label className="text-[11px] font-medium text-slate-400">{t('board.summary')}</label>
               <div className="p-3 bg-[#0d1017] rounded-lg border border-[#202738] text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">
-                {selectedCard.summary_plain || selectedCard.description || '暂无详细描述'}
+                {selectedCard.summary_plain || selectedCard.description || t('board.noDescription')}
               </div>
             </div>
 
@@ -231,7 +240,7 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
               <div className="flex items-center justify-between">
                 <label className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5">
                   <ListChecks size={13} className="text-amber-400" />
-                  <span>白话验收步骤 ({selectedCard.checklist.length})</span>
+                  <span>{t('board.acceptanceSteps', { count: selectedCard.checklist.length })}</span>
                 </label>
               </div>
 
@@ -246,14 +255,14 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
                       <span>{step.action}</span>
                     </div>
                     <div className="text-[11px] text-slate-400 pl-4">
-                      预期结果: {step.expected}
+                      {t('board.expectedResult', { expected: step.expected })}
                     </div>
                   </div>
                 ))}
 
                 {selectedCard.checklist.length === 0 && (
                   <div className="text-xs text-slate-600 p-3 text-center">
-                    暂未绑定验收步骤
+                    {t('board.noChecklist')}
                   </div>
                 )}
               </div>
@@ -264,7 +273,7 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
               onClick={() => onOpenTest(selectedCard.card_id)}
               className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow-lg shadow-emerald-950/20"
             >
-              <span>前往测试与预览台验证此卡片</span>
+              <span>{t('board.openTestWorkbench')}</span>
               <ArrowRight size={13} />
             </button>
           </div>

@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { Play, Square, Camera, TerminalSquare, Globe, Cpu, Languages, RotateCcw, Activity } from 'lucide-react';
+import {
+  Play,
+  Square,
+  Camera,
+  TerminalSquare,
+  Cpu,
+  Languages,
+  RotateCcw,
+  Activity,
+  Search,
+  Settings,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DevosProject } from '../types';
 import { Bridge } from '../services/tauriBridge';
@@ -11,6 +22,9 @@ interface TopBarProps {
   onTabChange: (tab: 'board' | 'test' | 'issues' | 'assets') => void;
   openIssuesCount: number;
   testingCount: number;
+  onOpenCommandPalette?: () => void;
+  onOpenSettings?: () => void;
+  onShowToast?: (type: 'success' | 'info' | 'warning' | 'error', msg: string) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -19,6 +33,9 @@ export const TopBar: React.FC<TopBarProps> = ({
   onTabChange,
   openIssuesCount,
   testingCount,
+  onOpenCommandPalette,
+  onOpenSettings,
+  onShowToast,
 }) => {
   const { t, i18n } = useTranslation();
   const [isRunning, setIsRunning] = useState(true);
@@ -31,15 +48,17 @@ export const TopBar: React.FC<TopBarProps> = ({
       const res = await Bridge.stopEnv('.', 'auto');
       if (res.ok) {
         setIsRunning(false);
+        onShowToast?.('info', t('toast.envStopped'));
       } else if (res.error) {
-        alert(`无法停止环境: ${res.error.plain_message || res.error.message}`);
+        alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
       }
     } else {
       const res = await Bridge.startEnv('.', 'auto');
       if (res.ok) {
         setIsRunning(true);
+        onShowToast?.('success', t('toast.envStarted'));
       } else if (res.error) {
-        alert(`启动环境失败: ${res.error.plain_message || res.error.message}`);
+        alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
       }
     }
     setIsBusy(false);
@@ -47,67 +66,71 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   const handleSnapshot = async () => {
     if (!project) return;
-    const name = window.prompt('请输入快照名称（如 baseline_v1）：', '');
+    const name = window.prompt(t('topbar.snapshotPrompt'), '');
     if (name === null) return;
     const res = await Bridge.createSnapshot('.', name);
     if (res.ok) {
-      alert(`已成功创建数据库与环境快照：${res.data}`);
+      onShowToast?.('success', t('topbar.snapshotSuccess', { id: res.data || name }));
     } else {
-      alert(`创建快照失败: ${res.error?.plain_message || res.error?.message}`);
+      alert(`${t('common.error')}: ${res.error?.plain_message || res.error?.message}`);
     }
   };
 
   const handleUndoRecentChange = () => {
     if (!project) return;
-    const ok = window.confirm(
-      '【历史时光机】是否撤销外部 AI 助手的最近一次改动并恢复到上一个代码快照？\n（注：基于独立影子快照，不污染你的 Git 历史分支）'
-    );
+    const ok = window.confirm(t('topbar.undoConfirm'));
     if (!ok) return;
-    alert('已恢复至上一个代码快照！工作区代码已干净复原。');
+    onShowToast?.('info', t('topbar.undoSuccess'));
   };
 
   if (!project) {
     return (
       <header className="h-[52px] bg-[#12151d] border-b border-[#1e2330] flex items-center px-6">
-        <span className="text-xs text-slate-500">请选择或新建一个项目以开始</span>
+        <span className="text-xs text-slate-500">{t('topbar.selectProject')}</span>
       </header>
     );
   }
 
   return (
-    <header className="h-[52px] bg-[#12151d] border-b border-[#1e2330] flex items-center justify-between px-5 shrink-0">
+    <header className="h-[52px] bg-[#12151d] border-b border-[#1e2330] flex items-center justify-between px-5 shrink-0 select-none">
       {/* Left Project Info & Mode */}
       <div className="flex items-center gap-3">
         <span className="text-sm font-semibold text-slate-100">{project.name}</span>
-        <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium">
-          本地开发态 ({project.mode})
+        <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+          {t('topbar.modeLocalDev', { mode: project.mode })}
         </span>
       </div>
 
-      {/* Center Nav Tabs (4 Core Views) */}
+      {/* Center Nav Tabs (4 Core Views with elastic width) */}
       <div className="flex items-center bg-[#181c27] p-1 rounded-lg border border-[#232938]">
         <button
           onClick={() => onTabChange('board')}
-          className={`px-3 py-1 text-xs rounded-md font-medium transition ${
+          className={`min-w-fit px-3 py-1 text-xs rounded-md font-medium transition ${
             activeTab === 'board'
-              ? 'bg-[#22c55e] text-slate-950 shadow-sm'
+              ? 'bg-[#22c55e] text-slate-950 font-bold shadow-sm'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          看板与进度
+          {t('topbar.tabBoard')}
         </button>
 
         <button
           onClick={() => onTabChange('test')}
-          className={`px-3 py-1 text-xs rounded-md font-medium transition flex items-center gap-1.5 ${
+          className={`min-w-fit px-3 py-1 text-xs rounded-md font-medium transition flex items-center gap-1.5 ${
             activeTab === 'test'
-              ? 'bg-[#22c55e] text-slate-950 shadow-sm'
+              ? 'bg-[#22c55e] text-slate-950 font-bold shadow-sm'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <span>测试与预览</span>
+          <span>{t('topbar.tabTest')}</span>
           {testingCount > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === 'test' ? 'bg-slate-900 text-emerald-400' : 'bg-emerald-500 text-slate-950'}`}>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                activeTab === 'test'
+                  ? 'bg-slate-900 text-emerald-400'
+                  : 'bg-emerald-500 text-slate-950'
+              }`}
+            >
               {testingCount}
             </span>
           )}
@@ -115,15 +138,19 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <button
           onClick={() => onTabChange('issues')}
-          className={`px-3 py-1 text-xs rounded-md font-medium transition flex items-center gap-1.5 ${
+          className={`min-w-fit px-3 py-1 text-xs rounded-md font-medium transition flex items-center gap-1.5 ${
             activeTab === 'issues'
-              ? 'bg-[#22c55e] text-slate-950 shadow-sm'
+              ? 'bg-[#22c55e] text-slate-950 font-bold shadow-sm'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <span>Issue 反馈</span>
+          <span>{t('topbar.tabIssues')}</span>
           {openIssuesCount > 0 && (
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${activeTab === 'issues' ? 'bg-slate-900 text-rose-400' : 'bg-rose-500 text-white'}`}>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                activeTab === 'issues' ? 'bg-slate-900 text-rose-400' : 'bg-rose-500 text-white'
+              }`}
+            >
               {openIssuesCount}
             </span>
           )}
@@ -131,28 +158,44 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         <button
           onClick={() => onTabChange('assets')}
-          className={`px-3 py-1 text-xs rounded-md font-medium transition ${
+          className={`min-w-fit px-3 py-1 text-xs rounded-md font-medium transition ${
             activeTab === 'assets'
-              ? 'bg-[#22c55e] text-slate-950 shadow-sm'
+              ? 'bg-[#22c55e] text-slate-950 font-bold shadow-sm'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          项目资产与标准
+          {t('topbar.tabAssets')}
         </button>
       </div>
 
       {/* Right Environment Status & Action Buttons */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
+        {/* Quick Search Shortcut Cmd+K */}
+        {onOpenCommandPalette && (
+          <button
+            onClick={onOpenCommandPalette}
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-[#181c27] hover:bg-[#202636] border border-[#232938] rounded-md text-[11px] text-slate-400 hover:text-slate-200 transition"
+            title={t('topbar.cmdKHint')}
+          >
+            <Search size={12} />
+            <span className="font-mono text-[10px] text-slate-500">⌘K</span>
+          </button>
+        )}
+
         {/* Environment Status Light */}
         <div className="flex items-center gap-2 px-2.5 py-1 bg-[#181c27] border border-[#232938] rounded-md text-[11px] text-slate-300">
           <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Web 容器运行中</span>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+              }`}
+            />
+            <span>{isRunning ? t('topbar.webRunning') : t('topbar.webStopped')}</span>
           </div>
           <span className="text-slate-600">|</span>
           <div className="flex items-center gap-1 text-slate-400">
             <Cpu size={12} className="text-blue-400" />
-            <span>脚本就绪</span>
+            <span>{t('topbar.scriptReady')}</span>
           </div>
         </div>
 
@@ -167,16 +210,16 @@ export const TopBar: React.FC<TopBarProps> = ({
           }`}
         >
           {isBusy ? (
-            <span>处理中...</span>
+            <span>{t('topbar.processing')}</span>
           ) : isRunning ? (
             <>
               <Square size={12} />
-              <span>停止环境</span>
+              <span>{t('topbar.stopEnv')}</span>
             </>
           ) : (
             <>
               <Play size={12} />
-              <span>启动环境</span>
+              <span>{t('topbar.startEnv')}</span>
             </>
           )}
         </button>
@@ -185,37 +228,41 @@ export const TopBar: React.FC<TopBarProps> = ({
         <button
           onClick={handleSnapshot}
           className="flex items-center gap-1 px-2.5 py-1.2 rounded-md text-xs font-medium bg-[#1e2330] hover:bg-[#282f42] text-slate-300 transition border border-[#2c3346]"
-          title="保存当前可用状态"
+          title={t('topbar.saveSnapshot')}
         >
           <Camera size={13} />
-          <span>保存快照</span>
+          <span>{t('topbar.saveSnapshot')}</span>
         </button>
 
         {/* Undo Recent AI Change (Time Machine) */}
         <button
           onClick={handleUndoRecentChange}
           className="flex items-center gap-1 px-2.5 py-1.2 rounded-md text-xs font-medium bg-[#1e2330] hover:bg-[#282f42] text-amber-300 transition border border-amber-500/30"
-          title="一键撤销 AI 最近改动（历史时光机）"
+          title={t('topbar.undoAiChange')}
         >
           <RotateCcw size={12} />
-          <span>回到上个版本</span>
+          <span>{t('topbar.undoAiChange')}</span>
         </button>
 
         {/* Global Background Task Bubble */}
         {isBusy && (
           <div className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-950/40 border border-cyan-800/40 rounded-md text-[11px] text-cyan-300 animate-pulse">
             <Activity size={12} className="animate-spin text-cyan-400" />
-            <span>后台任务运行中</span>
+            <span>{t('topbar.bgTaskRunning')}</span>
           </div>
         )}
 
         {/* Open in Agent */}
         <button
-          onClick={() => alert(`可在外部 Agent 工具（Claude Code / Droid / WorkBuddy 等）中执行:\n\ncd ${project.slug}\n devos brief`)}
+          onClick={() =>
+            alert(
+              `可在外部 Agent 工具（Claude Code / Cursor / Windsurf / Droid 等）中执行:\n\ncd ${project.slug}\ndevos brief`
+            )
+          }
           className="flex items-center gap-1 px-2.5 py-1.2 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold transition"
         >
           <TerminalSquare size={13} />
-          <span>在 Agent 中开始</span>
+          <span>{t('topbar.openInAgent')}</span>
         </button>
 
         {/* Language Hot-Switch */}
@@ -225,11 +272,22 @@ export const TopBar: React.FC<TopBarProps> = ({
             switchLanguage(nextLang);
           }}
           className="flex items-center gap-1 px-2 py-1.2 rounded-md text-xs font-mono bg-[#181c27] hover:bg-[#222736] text-slate-300 border border-slate-700/60 transition"
-          title="切换界面语言 (Language)"
+          title={t('common.switchLang')}
         >
           <Languages size={12} className="text-cyan-400" />
           <span>{i18n.language.startsWith('zh') ? 'EN' : '中'}</span>
         </button>
+
+        {/* Settings Button */}
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-[#181c27] border border-transparent hover:border-[#232938] transition"
+            title={t('common.settings')}
+          >
+            <Settings size={14} />
+          </button>
+        )}
       </div>
     </header>
   );

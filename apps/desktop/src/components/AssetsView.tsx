@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BookOpen,
   ShieldAlert,
@@ -33,6 +34,7 @@ interface AssetsViewProps {
 }
 
 export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
+  const { t } = useTranslation();
   const [selectedAsset, setSelectedAsset] = useState<
     'standards' | 'requirements' | 'run_manifest' | 'knowledge' | 'docs' | 'agents' | 'delivery' | 'secrets' | 'storage'
   >('standards');
@@ -142,7 +144,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
 
       {/* Left Tree Navigator */}
       <div className="w-60 bg-[#12151d] border-r border-[#1e2330] p-3 flex flex-col space-y-1">
-        <span className="text-xs text-slate-400 font-medium px-2 mb-2">项目标准与唯一真源</span>
+        <span className="text-xs text-slate-400 font-medium px-2 mb-2">{t('assets.title')}</span>
 
         <button
           onClick={() => setSelectedAsset('standards')}
@@ -153,7 +155,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
           }`}
         >
           <ShieldAlert size={14} className="text-amber-400" />
-          <span>项目标准 (给 AI 规范)</span>
+          <span>{t('assets.tabStandards')}</span>
         </button>
 
         <button
@@ -165,7 +167,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
           }`}
         >
           <BookOpen size={14} className="text-blue-400" />
-          <span>业务需求与范围</span>
+          <span>{t('assets.tabRequirements')}</span>
         </button>
 
         <button
@@ -177,7 +179,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
           }`}
         >
           <Code2 size={14} className="text-purple-400" />
-          <span>脚本运行声明 (run.json)</span>
+          <span>{t('assets.tabManifest')}</span>
         </button>
 
         <button
@@ -214,7 +216,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
             }`}
           >
             <Bot size={14} className="text-cyan-400" />
-            <span>AI Agent 一键连接</span>
+            <span>{t('sidebar.connectAgents')}</span>
           </button>
 
           <button
@@ -226,7 +228,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
             }`}
           >
             <Rocket size={14} className="text-emerald-400" />
-            <span>交付中心与部署插件</span>
+            <span>{t('assets.tabDeploy')}</span>
           </button>
 
           <button
@@ -238,7 +240,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
             }`}
           >
             <KeyRound size={14} className="text-amber-400" />
-            <span>密钥与配置 (.env)</span>
+            <span>{t('assets.tabSecrets')}</span>
           </button>
 
           <button
@@ -250,7 +252,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
             }`}
           >
             <HardDrive size={14} className="text-blue-400" />
-            <span>存储空间与清理</span>
+            <span>{t('assets.tabStorage')}</span>
           </button>
         </div>
       </div>

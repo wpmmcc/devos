@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Plus,
   Stethoscope,
-  FolderGit2,
   Kanban,
   FlaskConical,
   Bug,
@@ -10,7 +9,9 @@ import {
   Bot,
   Radio,
   Trash2,
+  Settings,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { DevosProject, RecentProjectDto } from '../types';
 
 interface SidebarProps {
@@ -24,6 +25,7 @@ interface SidebarProps {
   onOpenNewProject: () => void;
   onOpenDoctor: () => void;
   onOpenConflictDoctor?: () => void;
+  onOpenSettings?: () => void;
   runningProjectsCount?: number;
   onStopAllEnvironments?: () => void;
 }
@@ -39,9 +41,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenNewProject,
   onOpenDoctor,
   onOpenConflictDoctor,
+  onOpenSettings,
   runningProjectsCount,
   onStopAllEnvironments,
 }) => {
+  const { t } = useTranslation();
+
   return (
     <aside className="w-[220px] bg-[#12151d] border-r border-[#1e2330] flex flex-col justify-between shrink-0 h-screen select-none">
       {/* Brand Header */}
@@ -50,20 +55,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-bold text-emerald-400 text-sm">
             D
           </div>
-          <span className="font-semibold text-slate-100 tracking-wide text-sm">DevOS</span>
-          <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded ml-auto">
-            v0.2
-          </span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-slate-100 tracking-wide text-sm">DevOS</span>
+            <span className="text-[9px] text-slate-500">{t('sidebar.brandSubtitle')}</span>
+          </div>
         </div>
 
         {/* Project Section */}
         <div className="p-3">
           <div className="flex items-center justify-between text-xs text-slate-400 px-2 mb-2 font-medium">
-            <span>我的项目</span>
+            <span>{t('sidebar.myProjects')}</span>
             <button
               onClick={onOpenNewProject}
               className="p-1 hover:text-emerald-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
-              title="新建项目"
+              title={t('sidebar.newProject')}
             >
               <Plus size={14} />
             </button>
@@ -99,15 +104,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        const ok = window.confirm(
-                          `是否将项目「${p.name}」移入 DevOS 回收站归档？\n（数据将安全归档在 ~/.devos/trash，绝不物理抹除您的源码心血）`
-                        );
+                        const ok = window.confirm(t('sidebar.trashConfirm', { name: p.name }));
                         if (ok) {
-                          alert(`项目「${p.name}」已安全移入回收站归档。`);
+                          alert(t('sidebar.trashSuccess', { name: p.name }));
                         }
                       }}
                       className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded text-slate-500 transition"
-                      title="安全移入回收站"
+                      title={t('sidebar.moveToTrash')}
                     >
                       <Trash2 size={11} />
                     </button>
@@ -125,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }`}
                       >
                         <Kanban size={12} />
-                        <span>看板与进度</span>
+                        <span className="truncate">{t('sidebar.board')}</span>
                       </button>
 
                       <button
@@ -136,12 +139,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             : 'text-slate-400 hover:text-slate-200 hover:bg-[#161a24]'
                         }`}
                       >
-                        <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 truncate">
                           <FlaskConical size={12} />
-                          <span>测试与预览台</span>
+                          <span className="truncate">{t('sidebar.testPreview')}</span>
                         </span>
                         {testingCount > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-400">
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-400 shrink-0">
                             {testingCount}
                           </span>
                         )}
@@ -155,12 +158,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             : 'text-slate-400 hover:text-slate-200 hover:bg-[#161a24]'
                         }`}
                       >
-                        <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 truncate">
                           <Bug size={12} />
-                          <span>Issue 反馈中心</span>
+                          <span className="truncate">{t('sidebar.issues')}</span>
                         </span>
                         {openIssuesCount > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-500 text-white">
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-500 text-white shrink-0">
                             {openIssuesCount}
                           </span>
                         )}
@@ -175,7 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         }`}
                       >
                         <BookOpen size={12} />
-                        <span>项目资产与真源</span>
+                        <span className="truncate">{t('sidebar.assets')}</span>
                       </button>
                     </div>
                   )}
@@ -185,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {recentProjects.length === 0 && (
               <div className="px-2 py-4 text-xs text-slate-500 text-center">
-                暂无打开的项目
+                {t('sidebar.noProjects')}
               </div>
             )}
           </div>
@@ -201,15 +204,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 (runningProjectsCount || 0) > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'
               }`}
             />
-            <span className="text-[11px]">运行中: {runningProjectsCount ?? (currentProject ? 1 : 0)} 个</span>
+            <span className="text-[11px]">
+              {t('sidebar.runningCount', {
+                count: runningProjectsCount ?? (currentProject ? 1 : 0),
+              })}
+            </span>
           </div>
           {(runningProjectsCount || 0) > 0 && onStopAllEnvironments && (
             <button
               onClick={onStopAllEnvironments}
               className="text-[10px] text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 px-1.5 py-0.5 rounded border border-rose-500/30 transition font-medium"
-              title="一键停止所有运行中的 Docker 容器，释放电脑算力"
+              title={t('sidebar.stopAllConfirm')}
             >
-              停止全部
+              {t('sidebar.stopAll')}
             </button>
           )}
         </div>
@@ -223,9 +230,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <span className="flex items-center gap-2">
             <Bot size={14} className="text-cyan-400" />
-            <span>连接 Agent 工具</span>
+            <span>{t('sidebar.connectAgents')}</span>
           </span>
-          <span className="text-[10px] text-cyan-400 bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-800/40">
+          <span className="text-[10px] text-cyan-400 bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-800/40 font-mono">
             MCP
           </span>
         </button>
@@ -235,7 +242,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="w-full flex items-center gap-2 px-2.5 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-[#1a1f2c] rounded-lg transition"
         >
           <Stethoscope size={14} className="text-emerald-400" />
-          <span>环境体检 (Doctor)</span>
+          <span>{t('sidebar.preflightDoctor')}</span>
         </button>
 
         {onOpenConflictDoctor && (
@@ -244,11 +251,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-full flex items-center gap-2 px-2.5 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-[#1a1f2c] rounded-lg transition"
           >
             <Radio size={14} className="text-amber-400" />
-            <span>端口冲突诊断 (Conflict)</span>
+            <span>{t('sidebar.conflictDoctor')}</span>
+          </button>
+        )}
+
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-[#1a1f2c] rounded-lg transition"
+          >
+            <Settings size={14} className="text-slate-400" />
+            <span>{t('sidebar.settings')}</span>
           </button>
         )}
       </div>
     </aside>
   );
 };
-

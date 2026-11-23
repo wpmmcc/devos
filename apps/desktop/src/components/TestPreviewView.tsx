@@ -13,15 +13,14 @@ import {
   CheckSquare,
   Square,
   Camera,
-  Save,
-  Power,
   QrCode,
   Smartphone,
   X,
   Copy,
   Check,
 } from 'lucide-react';
-import { BoardCard, DevosProject, RunManifest, RunTarget, ScriptContext } from '../types';
+import { useTranslation } from 'react-i18next';
+import { BoardCard, DevosProject, RunManifest, ScriptContext } from '../types';
 import { devosProbe } from '../utils/probe';
 import { Bridge } from '../services/tauriBridge';
 
@@ -40,6 +39,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
   onOpenCreateIssue,
   onRunScript,
 }) => {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'web' | 'script'>(
     project.project_type === 'script' ? 'script' : 'web'
   );
@@ -85,18 +85,20 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
 
   const openLanModal = () => {
     setIsLanModalOpen(true);
-    QRCode.toDataURL(lanUrl, { width: 180, margin: 1 }).then(setQrDataUrl).catch(() => {});
+    QRCode.toDataURL(lanUrl, { width: 180, margin: 1 })
+      .then(setQrDataUrl)
+      .catch(() => {});
   };
 
   const handleCreateSnapshot = async () => {
-    const name = window.prompt('请输入快照名称（如 baseline_v1）：', '');
+    const name = window.prompt(t('topbar.snapshotPrompt'), '');
     if (name === null) return;
     setIsSnapshotting(true);
     const res = await Bridge.createSnapshot('.', name);
     if (res.ok) {
-      alert(`已成功创建数据库与环境快照：${res.data}`);
+      alert(t('topbar.snapshotSuccess', { id: res.data || name }));
     } else {
-      alert(`创建快照失败: ${res.error?.plain_message || res.error?.message}`);
+      alert(`${t('common.error')}: ${res.error?.plain_message || res.error?.message}`);
     }
     setIsSnapshotting(false);
   };
@@ -122,7 +124,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0b0d13] overflow-hidden">
+    <div className="flex-1 flex flex-col bg-[#0b0d13] overflow-hidden select-none">
       {/* Mode Switcher Header */}
       <div className="h-11 px-5 border-b border-[#1e2330] bg-[#12151d] flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -136,7 +138,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
               }`}
             >
               <Globe size={13} />
-              <span>Web 实时预览</span>
+              <span>{t('testPreview.webTab')}</span>
             </button>
           )}
 
@@ -150,7 +152,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
               }`}
             >
               <Terminal size={13} />
-              <span>后端脚本测试台</span>
+              <span>{t('testPreview.scriptTab')}</span>
             </button>
           )}
         </div>
@@ -161,20 +163,20 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
               <button
                 onClick={openLanModal}
                 className="flex items-center gap-1.5 px-3 py-1 bg-[#1a2130] hover:bg-[#232b3d] text-cyan-300 hover:text-white rounded-md text-xs font-medium border border-cyan-800/40 transition"
-                title="局域网真机扫码预览"
+                title={t('testPreview.lanPreview')}
               >
                 <QrCode size={13} className="text-cyan-400" />
-                <span>局域网真机预览</span>
+                <span>{t('testPreview.lanPreview')}</span>
               </button>
 
               <button
                 onClick={handleCreateSnapshot}
                 disabled={isSnapshotting}
                 className="flex items-center gap-1.5 px-3 py-1 bg-[#1a2130] hover:bg-[#232b3d] text-slate-300 hover:text-white rounded-md text-xs font-medium border border-[#2d374d] transition"
-                title="保存数据库与环境快照"
+                title={t('topbar.saveSnapshot')}
               >
                 <Camera size={13} className="text-amber-400" />
-                <span>{isSnapshotting ? '正在生成快照...' : '保存环境快照'}</span>
+                <span>{isSnapshotting ? t('common.loading') : t('topbar.saveSnapshot')}</span>
               </button>
 
               <button
@@ -182,7 +184,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                 className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-md text-xs font-medium shadow-md shadow-rose-950/30 transition animate-bounce"
               >
                 <Bug size={13} />
-                <span>反馈问题 / 提 Issue</span>
+                <span>{t('testPreview.createIssueBtn')}</span>
               </button>
             </>
           )}
@@ -222,7 +224,9 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                 <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3">
                   <Globe size={24} />
                 </div>
-                <h3 className="text-base font-semibold text-slate-100 mb-1">{project.name} Web 预览</h3>
+                <h3 className="text-base font-semibold text-slate-100 mb-1">
+                  {project.name} {t('testPreview.webTab')}
+                </h3>
                 <p className="text-xs text-slate-400 mb-4">
                   DDEV 本地环境运行中：<span className="text-emerald-400 font-mono">{previewUrl}</span>
                 </p>
@@ -235,7 +239,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                   onClick={handleTriggerWebIssue}
                   className="w-full py-2 bg-[#22c55e] hover:bg-emerald-500 text-slate-950 font-semibold rounded-lg text-xs transition"
                 >
-                  测试出现问题？点此反馈（自动附带报错探针日志）
+                  {t('testPreview.createIssueBtn')}
                 </button>
               </div>
             </div>
@@ -245,7 +249,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
           <div className="w-80 bg-[#12151d] p-4 flex flex-col">
             <h4 className="text-xs font-semibold text-slate-200 mb-3 flex items-center gap-1.5">
               <CheckCircle2 size={14} className="text-amber-400" />
-              <span>当前任务白话验收清单</span>
+              <span>{t('testPreview.checklistTitle', { count: checklist.length })}</span>
             </h4>
 
             {testingCard ? (
@@ -255,7 +259,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                     任务: {testingCard.title}
                   </div>
                   <div className="text-slate-400 text-[11px] leading-relaxed">
-                    {testingCard.summary_plain || 'AI 助手已提交提测，请根据以下步骤验收。'}
+                    {testingCard.summary_plain || t('testPreview.checklistSubtitle')}
                   </div>
                 </div>
 
@@ -271,14 +275,18 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                       }`}
                     >
                       <button className="mt-0.5 text-emerald-400">
-                        {step.checked ? <CheckSquare size={14} /> : <Square size={14} className="text-slate-500" />}
+                        {step.checked ? (
+                          <CheckSquare size={14} />
+                        ) : (
+                          <Square size={14} className="text-slate-500" />
+                        )}
                       </button>
                       <div className="flex-1 text-xs">
                         <div className="font-medium mb-0.5">
                           第 {step.step} 步: {step.action}
                         </div>
                         <div className="text-[11px] text-slate-400">
-                          预期结果: {step.expected}
+                          {t('board.expectedResult', { expected: step.expected })}
                         </div>
                       </div>
                     </div>
@@ -287,7 +295,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
               </div>
             ) : (
               <div className="text-xs text-slate-500 text-center py-10">
-                当前暂无处于“待我测试”状态的任务卡片
+                {t('testPreview.noTestingCards')}
               </div>
             )}
           </div>
@@ -298,34 +306,34 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
           {/* Left Target List */}
           <div className="w-64 bg-[#12151d] border-r border-[#1e2330] p-3 flex flex-col">
             <span className="text-xs text-slate-400 font-medium px-2 mb-2">
-              可用任务列表 (devos.run.json)
+              {t('testPreview.scriptList')}
             </span>
             <div className="space-y-1">
-              {targets.map((t) => (
+              {targets.map((tgt) => (
                 <button
-                  key={t.id}
+                  key={tgt.id}
                   onClick={() => {
-                    setSelectedTargetId(t.id);
+                    setSelectedTargetId(tgt.id);
                     const init: Record<string, any> = {};
-                    t.inputs.forEach((i) => {
+                    tgt.inputs.forEach((i) => {
                       init[i.name] = i.default ?? '';
                     });
                     setFormInputs(init);
                   }}
                   className={`w-full text-left p-2.5 rounded-lg border transition text-xs ${
-                    selectedTargetId === t.id
+                    selectedTargetId === tgt.id
                       ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-medium'
                       : 'bg-[#151924] border-[#202636] text-slate-300 hover:border-[#2f384e]'
                   }`}
                 >
-                  <div className="font-medium text-slate-100">{t.label}</div>
-                  <div className="text-[11px] text-slate-400 truncate mt-0.5">{t.description}</div>
+                  <div className="font-medium text-slate-100">{tgt.label}</div>
+                  <div className="text-[11px] text-slate-400 truncate mt-0.5">{tgt.description}</div>
                 </button>
               ))}
 
               {targets.length === 0 && (
                 <div className="text-xs text-slate-500 p-4 text-center">
-                  未声明可测试的任务
+                  {t('common.empty')}
                 </div>
               )}
             </div>
@@ -394,121 +402,130 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                     className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition"
                   >
                     <Play size={13} />
-                    <span>{isRunning ? '正在容器沙盒中执行测试...' : '运行测试'}</span>
+                    <span>{isRunning ? t('testPreview.runningScript') : t('testPreview.runScript')}</span>
                   </button>
                 </div>
 
-                {/* Execution Result Box */}
+                {/* Output Console Box */}
                 {lastScriptResult && (
-                  <div className="bg-[#141824] p-5 rounded-xl border border-[#22293a] space-y-3">
+                  <div className="bg-[#12151d] rounded-xl border border-[#202738] p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-200">执行结果</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-slate-400">
-                          耗时: {lastScriptResult.duration_ms}ms
-                        </span>
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                            lastScriptResult.exit_code === 0
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-rose-500/20 text-rose-400'
-                          }`}
-                        >
-                          退出码: {lastScriptResult.exit_code}
+                        {lastScriptResult.exit_code === 0 ? (
+                          <CheckCircle2 size={16} className="text-emerald-400" />
+                        ) : (
+                          <AlertCircle size={16} className="text-rose-400" />
+                        )}
+                        <span className="text-xs font-semibold text-slate-100">
+                          {lastScriptResult.exit_code === 0
+                            ? t('testPreview.scriptSuccess', { duration: lastScriptResult.duration_ms })
+                            : t('testPreview.scriptFailed', { code: lastScriptResult.exit_code })}
                         </span>
                       </div>
+
+                      {lastScriptResult.exit_code !== 0 && (
+                        <button
+                          onClick={() =>
+                            onOpenCreateIssue({
+                              source_type: 'script_run',
+                              script: lastScriptResult,
+                              title: `脚本 ${currentTarget.label} 运行失败`,
+                              description: `退出码 ${lastScriptResult.exit_code}，请协助排查修复。`,
+                            })
+                          }
+                          className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-medium transition"
+                        >
+                          {t('testPreview.convertScriptIssue')}
+                        </button>
+                      )}
                     </div>
 
-                    {lastScriptResult.stderr_tail && (
-                      <div className="p-3 bg-rose-950/20 border border-rose-900/30 rounded-lg text-rose-300 font-mono text-xs whitespace-pre-wrap">
-                        {lastScriptResult.stderr_tail}
-                      </div>
-                    )}
+                    <div className="p-3 bg-[#0a0c10] rounded-lg border border-[#1b212f] font-mono text-[11px] text-slate-300 max-h-48 overflow-y-auto whitespace-pre-wrap">
+                      {lastScriptResult.stdout_tail || lastScriptResult.stderr_tail || '运行完成，未产生终端输出。'}
+                    </div>
 
-                    {lastScriptResult.stdout_tail && (
-                      <div className="p-3 bg-[#0d1017] border border-[#232938] rounded-lg text-slate-300 font-mono text-xs whitespace-pre-wrap">
-                        {lastScriptResult.stdout_tail}
+                    {lastScriptResult.output_files_generated && lastScriptResult.output_files_generated.length > 0 && (
+                      <div className="pt-2 border-t border-[#1e2330]">
+                        <span className="text-[11px] text-slate-400 mb-2 block font-medium">
+                          {t('testPreview.outputFiles')}:
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {lastScriptResult.output_files_generated.map((filePath) => (
+                            <div
+                              key={filePath}
+                              className="px-2.5 py-1.5 bg-[#181d2a] rounded border border-[#252c3d] text-xs text-slate-200 flex items-center gap-1.5"
+                            >
+                              <FileText size={12} className="text-emerald-400" />
+                              <span>{filePath}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    )}
-
-                    {lastScriptResult.exit_code !== 0 && (
-                      <button
-                        onClick={() =>
-                          onOpenCreateIssue({
-                            source_type: 'script_run',
-                            script: lastScriptResult,
-                            title: `脚本 ${currentTarget.label} 执行失败`,
-                            description: `执行命令失败并返回退出码 ${lastScriptResult.exit_code}`,
-                          })
-                        }
-                        className="w-full py-2 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition"
-                      >
-                        <Bug size={13} />
-                        <span>结果异常？一键转为 Issue 通知 AI 修复</span>
-                      </button>
                     )}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-xs text-slate-500 text-center py-20">
-                请从左侧选择一个要测试的任务
+              <div className="flex-1 flex items-center justify-center text-xs text-slate-500">
+                请从左侧选择一个任务目标开始测试
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* LAN Preview & QR Code Modal */}
+      {/* LAN Mobile QR Code Modal */}
       {isLanModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#141824] border border-[#222938] rounded-2xl max-w-sm w-full p-6 shadow-2xl relative text-center">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#141824] border border-[#232c3f] rounded-2xl max-w-sm w-full p-6 shadow-2xl relative flex flex-col items-center text-center">
             <button
               onClick={() => setIsLanModalOpen(false)}
-              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-[#202636] transition"
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-[#202738] transition"
             >
               <X size={16} />
             </button>
 
-            <div className="w-10 h-10 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto mb-3">
+            <div className="w-10 h-10 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center mb-3">
               <Smartphone size={20} />
             </div>
 
-            <h3 className="text-base font-bold text-slate-100 mb-1">局域网真机扫码预览</h3>
-            <p className="text-xs text-slate-400 mb-4">
-              确保手机与电脑连接同一 Wi-Fi，打开微信或系统相机即可扫码直接测试页面。
+            <h3 className="text-base font-bold text-slate-100 mb-1">
+              {t('testPreview.mobileScan')}
+            </h3>
+            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+              确保手机连接在同一个局域网 Wi-Fi 下，用手机相机扫码即可直接访问并验收：
             </p>
 
             {qrDataUrl ? (
-              <div className="bg-white p-3 rounded-xl inline-block shadow-lg mb-4">
-                <img src={qrDataUrl} alt="LAN QR Code" className="w-44 h-44 object-contain mx-auto" />
+              <div className="p-3 bg-white rounded-xl shadow-lg mb-4">
+                <img src={qrDataUrl} alt="LAN QR Code" className="w-44 h-44 rounded" />
               </div>
             ) : (
-              <div className="w-44 h-44 bg-[#0f1118] border border-dashed border-slate-700 rounded-xl flex items-center justify-center mx-auto mb-4 text-xs text-slate-500">
-                生成二维码中...
+              <div className="w-44 h-44 bg-slate-800 rounded-xl flex items-center justify-center text-xs text-slate-400 mb-4">
+                {t('common.loading')}
               </div>
             )}
 
-            <div className="flex items-center gap-2 bg-[#0d1017] border border-[#222938] rounded-lg p-2 text-xs mb-4">
-              <span className="text-slate-400 font-mono text-[11px] truncate flex-1">{lanUrl}</span>
+            <div className="w-full bg-[#0d1017] border border-[#222938] rounded-lg p-2.5 flex items-center justify-between text-xs font-mono text-cyan-300 mb-4">
+              <span className="truncate">{lanUrl}</span>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(lanUrl);
                   setIsCopiedLan(true);
                   setTimeout(() => setIsCopiedLan(false), 2000);
                 }}
-                className="p-1.5 hover:bg-[#202636] rounded text-slate-300 transition"
-                title="复制地址"
+                className="ml-2 px-2 py-1 bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 rounded border border-cyan-800/40 text-[11px] flex items-center gap-1 transition shrink-0"
               >
-                {isCopiedLan ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                {isCopiedLan ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                <span>{isCopiedLan ? t('common.copied') : t('testPreview.copyLink')}</span>
               </button>
             </div>
 
             <button
               onClick={() => setIsLanModalOpen(false)}
-              className="w-full py-2 bg-[#1e2433] hover:bg-[#283144] text-slate-200 rounded-lg text-xs font-semibold transition"
+              className="w-full py-2 bg-[#1f2535] hover:bg-[#2a3247] text-slate-300 rounded-lg text-xs font-semibold transition"
             >
-              关闭
+              {t('common.close')}
             </button>
           </div>
         </div>

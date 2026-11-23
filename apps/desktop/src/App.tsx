@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, AlertTriangle, X } from 'lucide-react';
+import { ShieldCheck, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { BoardView } from './components/BoardView';
@@ -10,10 +11,24 @@ import { NewProjectModal } from './components/NewProjectModal';
 import { PreflightDoctorModal } from './components/PreflightDoctorModal';
 import { CreateIssueModal } from './components/CreateIssueModal';
 import { ConflictDoctorModal } from './components/ConflictDoctorModal';
-import { BoardCard, BoardColumn, DevosProject, Issue, ProjectType, RecentProjectDto, RunManifest, ScriptContext } from './types';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { SettingsModal } from './components/SettingsModal';
+import { ToastContainer, ToastItem } from './components/ToastContainer';
+import { switchLanguage } from './i18n';
+import {
+  BoardCard,
+  BoardColumn,
+  DevosProject,
+  Issue,
+  ProjectType,
+  RecentProjectDto,
+  RunManifest,
+  ScriptContext,
+} from './types';
 import { Bridge } from './services/tauriBridge';
 
 export const App: React.FC = () => {
+  const { t, i18n } = useTranslation();
   const [currentProjectPath, setCurrentProjectPath] = useState<string>('.');
   const [project, setProject] = useState<DevosProject | null>(null);
   const [recentProjects, setRecentProjects] = useState<RecentProjectDto[]>([]);
@@ -28,7 +43,36 @@ export const App: React.FC = () => {
   const [isConflictDoctorOpen, setIsConflictDoctorOpen] = useState(false);
   const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
   const [isTrustModalOpen, setIsTrustModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [issueModalData, setIssueModalData] = useState<any>(null);
+
+  // Toasts state
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const addToast = (
+    type: 'success' | 'info' | 'warning' | 'error',
+    message: string,
+    actionText?: string,
+    copyText?: string
+  ) => {
+    const id = 'toast_' + Math.random().toString(36).substring(2, 9);
+    const newToast: ToastItem = {
+      id,
+      type,
+      message,
+      actionText,
+      copyText,
+    };
+    setToasts((prev) => [...prev, newToast]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((item) => item.id !== id));
+    }, 6000);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((item) => item.id !== id));
+  };
 
   const loadRecentProjects = async () => {
     const res = await Bridge.getRecentProjects();
@@ -76,7 +120,16 @@ export const App: React.FC = () => {
       loadProjectData('.');
     });
 
-    // 2. Setup real-time event listeners from Tauri Core
+    // 2. Global shortcut Cmd/Ctrl + K
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    // 3. Setup real-time event listeners from Tauri Core
     let unlistenBoard: any;
     let unlistenIssues: any;
     let unlistenProject: any;
@@ -101,11 +154,12 @@ export const App: React.FC = () => {
     });
 
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       if (typeof unlistenBoard === 'function') unlistenBoard();
       if (typeof unlistenIssues === 'function') unlistenIssues();
       if (typeof unlistenProject === 'function') unlistenProject();
     };
-  }, []);
+  }, [currentProjectPath]);
 
   const handleCreateProject = async (
     name: string,
@@ -120,6 +174,7 @@ export const App: React.FC = () => {
       refreshIssues('.');
       refreshManifest('.');
       loadRecentProjects();
+      addToast('success', t('common.success'));
     }
   };
 
@@ -128,8 +183,9 @@ export const App: React.FC = () => {
     const res = await Bridge.moveCard(currentProjectPath, cardId, col, 'user');
     if (res.ok) {
       refreshCards();
+      addToast('success', t('toast.cardMoved', { col: t(`board.${col}`) }));
     } else if (res.error) {
-      alert(`无法流转卡片: ${res.error.plain_message || res.error.message}`);
+      alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
     }
   };
 
@@ -139,6 +195,7 @@ export const App: React.FC = () => {
     if (res.ok) {
       refreshIssues();
       refreshCards();
+      addToast('success', passed ? t('issues.retestPass') : t('issues.retestFail'));
     }
   };
 
@@ -182,8 +239,16 @@ export const App: React.FC = () => {
     if (res.ok) {
       refreshIssues();
       setActiveTab('issues');
+      const issueId = res.data?.issue_id || 'ISS-001';
+      const copyCmd = `请处理「${project.name}」(${project.project_id}) 的 ${issueId}: ${title}`;
+      addToast(
+        'info',
+        t('toast.issueCreated', { id: issueId }),
+        t('toast.copyInstruction'),
+        copyCmd
+      );
     } else if (res.error) {
-      alert(`提交 Issue 失败: ${res.error.plain_message || res.error.message}`);
+      alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
     }
   };
 
@@ -206,14 +271,15 @@ export const App: React.FC = () => {
         onOpenNewProject={() => setIsNewProjectOpen(true)}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onOpenConflictDoctor={() => setIsConflictDoctorOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         runningProjectsCount={project ? 1 : 0}
         onStopAllEnvironments={async () => {
-          const ok = window.confirm('是否停止所有正在运行的容器环境？这将彻底释放系统算力与内存。');
+          const ok = window.confirm(t('sidebar.stopAllConfirm'));
           if (!ok) return;
           if (project) {
             await Bridge.stopEnv('.', 'auto');
           }
-          alert('已向所有受控容器发送停止信号，内存与端口已释放！');
+          addToast('info', t('sidebar.stopAllSuccess'));
         }}
       />
 
@@ -226,6 +292,9 @@ export const App: React.FC = () => {
           onTabChange={setActiveTab}
           openIssuesCount={openIssuesCount}
           testingCount={testingCount}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onShowToast={(type, msg) => addToast(type, msg)}
         />
 
         {/* Workspace Body */}
@@ -259,6 +328,9 @@ export const App: React.FC = () => {
                 onNavigateToTest={() => setActiveTab('test')}
                 projectName={project.name}
                 projectId={project.project_id}
+                onShowToast={(type, msg, actionText, copyText) =>
+                  addToast(type, msg, actionText, copyText)
+                }
               />
             )}
 
@@ -266,12 +338,12 @@ export const App: React.FC = () => {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-500 text-xs">
-            请从左侧选择项目或点击“新建项目”开始
+            {t('topbar.selectProject')}
           </div>
         )}
       </div>
 
-      {/* Modals */}
+      {/* Modals & Dialogs */}
       <NewProjectModal
         isOpen={isNewProjectOpen}
         onClose={() => setIsNewProjectOpen(false)}
@@ -297,6 +369,51 @@ export const App: React.FC = () => {
         onSubmit={handleSubmitIssue}
       />
 
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+        onToggleEnv={async () => {
+          if (!project) return;
+          await Bridge.stopEnv('.', 'auto');
+          addToast('info', t('toast.envStopped'));
+        }}
+        onTakeSnapshot={() => {
+          if (!project) return;
+          const name = window.prompt(t('topbar.snapshotPrompt'), '');
+          if (name) {
+            Bridge.createSnapshot('.', name).then((res) => {
+              if (res.ok) addToast('success', t('topbar.snapshotSuccess', { id: res.data || name }));
+            });
+          }
+        }}
+        onTimeMachine={() => {
+          if (!project) return;
+          if (window.confirm(t('topbar.undoConfirm'))) {
+            addToast('info', t('topbar.undoSuccess'));
+          }
+        }}
+        onSwitchLang={() => {
+          const next = i18n.language.startsWith('zh') ? 'en-US' : 'zh-CN';
+          switchLanguage(next);
+        }}
+        onCleanStorage={() => {
+          setActiveTab('assets');
+          addToast('success', t('assets.cleanSuccess'));
+        }}
+        onOpenDoctor={() => setIsDoctorOpen(true)}
+        onOpenConflictDoctor={() => setIsConflictDoctorOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        isEnvRunning={true}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
+
       {/* Workspace Trust Modal for Imported Projects */}
       {isTrustModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -313,34 +430,34 @@ export const App: React.FC = () => {
             </div>
 
             <h3 className="text-base font-bold text-slate-100 mb-1">
-              工作区安全信任确认 (Workspace Trust)
+              {t('modals.trust.title')}
             </h3>
             <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-              检测到当前打开的项目目录可能来自外部下载或第三方分享。为防止未知工程中的恶意脚本自动执行，在您信任此工作区前，DevOS 已自动阻断自动启动容器、网络端口映射与脚本执行。
+              {t('modals.trust.desc')}
             </p>
 
             <div className="p-3 bg-[#0d1017] border border-[#222938] rounded-lg text-[11px] text-slate-300 space-y-1 mb-5">
-              <div className="font-semibold text-emerald-400">🛡️ DevOS 安全防御围栏已激活：</div>
-              <div>• 外部 DevContainer / Dockerfile 脚本暂不自动拉起</div>
-              <div>• 敏感配置文件（.env）对外部 Agent 保持掩码隔离</div>
-              <div>• 自动阻断任何非当前项目目录的越权路径访问</div>
+              <div className="font-semibold text-emerald-400">{t('modals.trust.firewallTitle')}</div>
+              <div>• {t('modals.trust.f1')}</div>
+              <div>• {t('modals.trust.f2')}</div>
+              <div>• {t('modals.trust.f3')}</div>
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={() => {
                   setIsTrustModalOpen(false);
-                  alert('已确认为受信任工作区，完整容器运行与测试环境已激活！');
+                  addToast('success', '已确认为受信任工作区，完整容器运行与测试环境已激活！');
                 }}
                 className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-lg text-xs transition"
               >
-                信任并启用完整环境
+                {t('modals.trust.trustBtn')}
               </button>
               <button
                 onClick={() => setIsTrustModalOpen(false)}
                 className="px-4 py-2 bg-[#1e2433] hover:bg-[#283144] text-slate-300 rounded-lg text-xs font-semibold transition"
               >
-                仅以只读模式浏览
+                {t('modals.trust.readOnlyBtn')}
               </button>
             </div>
           </div>
