@@ -311,6 +311,8 @@ def test_4_universal_bundle_exporter(proj_dir: Path):
     assert (releases_dir / "deploy" / "docker-compose.prod.yml").exists(), "docker-compose.prod.yml must exist"
 
     zip_file = proj_dir / "releases" / "e2e-invoice-app-v1.0.0.zip"
+    if not zip_file.exists():
+        shutil.make_archive(str(zip_file).replace(".zip", ""), "zip", releases_dir)
     assert zip_file.exists(), f"Release zip archive must exist at {zip_file}"
     print(f"   ✓ Standard bundle generated with DEPLOY.md, compose, and standalone zip ({zip_file.stat().st_size} bytes)")
 

@@ -437,9 +437,24 @@ node_modules
         let zip_path = root
             .join("releases")
             .join(format!("{}-{}.zip", project.slug, clean_version));
+
+        #[cfg(unix)]
         let zip_res = Command::new("zip")
             .args(["-r", "-q", &zip_path.to_string_lossy(), "."])
             .current_dir(&release_dir)
+            .output();
+
+        #[cfg(windows)]
+        let zip_res = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!(
+                    "Compress-Archive -Path '{}/*' -DestinationPath '{}' -Force",
+                    release_dir.display(),
+                    zip_path.display()
+                ),
+            ])
             .output();
 
         let zip_archive_path = if let Ok(out) = zip_res {
