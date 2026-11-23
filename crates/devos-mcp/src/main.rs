@@ -178,6 +178,7 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                 let cards = BoardManager::list_cards(&root, &project)?;
                 let issues = IssueManager::list_issues(&root, &project, Some("open"))?;
 
+                let locale = std::env::var("DEVOS_LOCALE").unwrap_or_else(|_| "zh-CN".to_string());
                 let mut brief = json!({
                     "project_id": project.project_id,
                     "slug": project.slug,
@@ -188,6 +189,11 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                     "environments": project.environments,
                     "board_cards_count": cards.len(),
                     "open_issues_count": issues.len(),
+                    "user_locale": locale,
+                    "agent_instructions": format!(
+                        "请使用当前用户的语言 ({}) 编写白话总结、提测清单与问题排查说明。所有依赖安装与测试命令必须调用 env_control 在容器内执行。",
+                        locale
+                    ),
                 });
 
                 if include_standards {

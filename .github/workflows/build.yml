@@ -39,6 +39,9 @@ jobs:
       - name: Run Cargo Tests
         run: cargo test --workspace
 
+      - name: Run CLI Headless Smoke Test
+        run: cargo run -p devos-cli -- --smoke-test
+
   test-frontend:
     name: Frontend Build & Typecheck
     runs-on: ubuntu-latest

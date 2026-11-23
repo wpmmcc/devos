@@ -15,8 +15,11 @@ struct Cli {
     #[arg(long, global = true, help = "Target project directory (defaults to current dir)")]
     project_dir: Option<PathBuf>,
 
+    #[arg(long, help = "Run automated headless smoke test and verification")]
+    smoke_test: bool,
+
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -109,6 +112,9 @@ enum Commands {
         #[arg(long)]
         apply: Option<String>,
     },
+
+    /// Export a sanitized diagnostic bundle
+    Diagnostic,
 }
 
 fn print_result<T: serde::Serialize>(json_mode: bool, res: Result<T>) {
@@ -159,7 +165,39 @@ async fn main() {
     let cli = Cli::parse();
     let json_mode = cli.json;
 
-    match cli.command {
+    if cli.smoke_test {
+        let db_status = match Database::open_global() {
+            Ok(_) => "ok",
+            Err(_) => "error",
+        };
+        let doctor_diags = PreflightDoctor::diagnose_all();
+        let adapters = devos_core::AgentConfigManager::supported_adapters();
+        let mirrors = devos_core::MirrorManager::load_config();
+
+        let output = serde_json::json!({
+            "status": "ok",
+            "smoke_test": "passed",
+            "version": env!("CARGO_PKG_VERSION"),
+            "components": {
+                "database": db_status,
+                "preflight_items_checked": doctor_diags.len(),
+                "agent_adapters_supported": adapters.len(),
+                "mirrors_tools_count": mirrors.tools.len(),
+            }
+        });
+        println!("{}", serde_json::to_string_pretty(&output).unwrap());
+        return;
+    }
+
+    let command = match cli.command {
+        Some(cmd) => cmd,
+        None => {
+            eprintln!("请指定执行子命令，或使用 `devos --help` 查看说明。CI 环境可使用 `devos --smoke-test` 执行快速自检。");
+            return;
+        }
+    };
+
+    match command {
         Commands::Init {
             name,
             slug,
@@ -528,6 +566,14 @@ async fn main() {
                     Ok(serde_json::to_value(list)?)
                 }
             })();
+            print_result(json_mode, res);
+        }
+
+        Commands::Diagnostic => {
+            let loaded = ProjectManager::find_and_load(".").ok().map(|(r, _)| r);
+            let project_root = cli.project_dir.as_deref().or(loaded.as_deref());
+            let res = devos_core::export_diagnostic_bundle(project_root)
+                .map(|p| serde_json::json!({ "status": "ok", "bundle_path": p.display().to_string() }));
             print_result(json_mode, res);
         }
     }

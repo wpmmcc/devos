@@ -1,0 +1,53 @@
+{
+  "common": {
+    "appName": "DevOS",
+    "confirm": "确定",
+    "cancel": "取消",
+    "save": "保存",
+    "loading": "加载中...",
+    "success": "成功",
+    "error": "错误",
+    "refresh": "刷新",
+    "close": "关闭",
+    "done": "完成",
+    "language": "语言",
+    "switchLang": "中/EN"
+  },
+  "sidebar": {
+    "projects": "项目清单",
+    "board": "研发看板",
+    "testPreview": "真源测试台",
+    "issues": "验收反馈 (Issues)",
+    "assets": "项目资产与真源",
+    "connectAgents": "连接 Agent 工具",
+    "preflightDoctor": "环境体检 (Doctor)",
+    "conflictDoctor": "端口冲突诊断 (Conflict)",
+    "noProjects": "暂无打开的项目",
+    "newProject": "新建项目"
+  },
+  "topbar": {
+    "devLocal": "本地开发 (全权掌控)",
+    "contentLocal": "内容开发 (保护结构)",
+    "deployProd": "生产部署 (受限防护)",
+    "openIssues": "待修问题",
+    "inTesting": "待测卡片",
+    "visitSite": "打开网页",
+    "runTest": "运行测试"
+  },
+  "board": {
+    "todo": "待开发 (Todo)",
+    "doing": "开发中 (Doing)",
+    "testing": "待测试验收 (Testing)",
+    "done": "已验收完成 (Done)",
+    "openTest": "去测试台验收",
+    "empty": "暂无卡片"
+  },
+  "doctor": {
+    "title": "环境体检与网络加速向导",
+    "desc": "检查 Docker、DDEV 与网络就绪状态；DevOS 支持私有工具链与国内 4 层下载加速。",
+    "networkStrategy": "国内网络下载加速策略",
+    "raceSpeed": "2秒并发测速 (Race)",
+    "recheck": "重新体检",
+    "importLocal": "已有本地安装包？点此导入"
+  }
+}

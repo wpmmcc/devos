@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Play, Square, Camera, TerminalSquare, Globe, Cpu } from 'lucide-react';
+import { Play, Square, Camera, TerminalSquare, Globe, Cpu, Languages } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { DevosProject } from '../types';
 import { Bridge } from '../services/tauriBridge';
+import { switchLanguage } from '../i18n';
 
 interface TopBarProps {
   project: DevosProject | null;
@@ -18,6 +20,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   openIssuesCount,
   testingCount,
 }) => {
+  const { t, i18n } = useTranslation();
   const [isRunning, setIsRunning] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
 
@@ -186,6 +189,19 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           <TerminalSquare size={13} />
           <span>在 Agent 中开始</span>
+        </button>
+
+        {/* Language Hot-Switch */}
+        <button
+          onClick={() => {
+            const nextLang = i18n.language.startsWith('zh') ? 'en-US' : 'zh-CN';
+            switchLanguage(nextLang);
+          }}
+          className="flex items-center gap-1 px-2 py-1.2 rounded-md text-xs font-mono bg-[#181c27] hover:bg-[#222736] text-slate-300 border border-slate-700/60 transition"
+          title="切换界面语言 (Language)"
+        >
+          <Languages size={12} className="text-cyan-400" />
+          <span>{i18n.language.startsWith('zh') ? 'EN' : '中'}</span>
         </button>
       </div>
     </header>

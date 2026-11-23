@@ -635,6 +635,14 @@ fn import_local_tool_package(tool_name: String, source_path: String) -> ApiRespo
     to_api_resp(res)
 }
 
+#[tauri::command]
+fn export_diagnostic_bundle(project_path: Option<String>) -> ApiResponse<String> {
+    let p_root = project_path.as_deref().map(Path::new);
+    let res = devos_core::export_diagnostic_bundle(p_root)
+        .map(|p| p.display().to_string());
+    to_api_resp(res)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -675,7 +683,8 @@ pub fn run() {
             get_mirrors_config,
             save_mirrors_config,
             race_mirrors_speed,
-            import_local_tool_package
+            import_local_tool_package,
+            export_diagnostic_bundle
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

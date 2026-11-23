@@ -166,6 +166,9 @@ export const Bridge = {
 
   importLocalToolPackage: (toolName: string, sourcePath: string) =>
     invokeTauri<string>('import_local_tool_package', { toolName, sourcePath }),
+
+  exportDiagnosticBundle: (projectPath?: string) =>
+    invokeTauri<string>('export_diagnostic_bundle', { projectPath }),
 };
 
 // Mock Fallbacks for Browser

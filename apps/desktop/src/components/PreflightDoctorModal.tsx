@@ -78,6 +78,19 @@ export const PreflightDoctorModal: React.FC<PreflightDoctorModalProps> = ({
     }
   };
 
+  const handleExportDiagnostics = async () => {
+    try {
+      const res = await Bridge.exportDiagnosticBundle('.');
+      if (res.ok && res.data) {
+        showToast(`已成功导出脱敏诊断包: ${res.data}`);
+      } else {
+        showToast(`导出失败: ${res.error?.plain_message || res.error?.message}`);
+      }
+    } catch (e: any) {
+      showToast(`导出异常: ${String(e)}`);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -247,14 +260,23 @@ export const PreflightDoctorModal: React.FC<PreflightDoctorModalProps> = ({
         </div>
 
         <div className="flex items-center justify-between pt-3 border-t border-[#202636]">
-          <button
-            onClick={loadDoctor}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#1e2330] hover:bg-[#282f42] text-slate-300 transition"
-          >
-            <RotateCw size={13} className={loading ? 'animate-spin' : ''} />
-            <span>重新体检</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={loadDoctor}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#1e2330] hover:bg-[#282f42] text-slate-300 transition"
+            >
+              <RotateCw size={13} className={loading ? 'animate-spin' : ''} />
+              <span>重新体检</span>
+            </button>
+            <button
+              onClick={handleExportDiagnostics}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-[#1a202c] transition"
+              title="一键收集并脱敏导出诊断日志与系统配置"
+            >
+              <span>📦 导出脱敏诊断包</span>
+            </button>
+          </div>
 
           <button
             onClick={onClose}

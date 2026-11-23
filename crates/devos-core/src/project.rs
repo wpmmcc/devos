@@ -111,6 +111,7 @@ impl ProjectManager {
 3. **维护运行清单：** 若新增后端脚本，必须同步更新 `devos.run.json`。
 4. **标准化提测：** 开发完毕后调用 `submit_for_testing`，附带清晰的白话验收步骤。机器将先执行预检，通过后推送给用户测试。
 5. **处理反馈与 Issue：** 当用户提测发现问题，调用 `list_issues` 获取完整排障上下文并修复，使用 `resolve_issue` 提请用户复测。
+6. **多语言与白话交付：** 根据 `get_project_brief` 返回的 `user_locale` 使用对应语言编写交付说明，避免使用难以理解的技术黑话。
 "#,
             name = name
         );

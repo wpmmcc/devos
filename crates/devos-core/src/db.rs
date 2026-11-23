@@ -97,9 +97,20 @@ impl Database {
                 last_opened_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS activity_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                summary_plain TEXT NOT NULL,
+                details_json TEXT,
+                created_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_board_proj ON board_cards(project_id, col);
             CREATE INDEX IF NOT EXISTS idx_issues_proj ON issues(project_id, status);
             CREATE INDEX IF NOT EXISTS idx_assets_proj ON assets(project_id, asset_type);
+            CREATE INDEX IF NOT EXISTS idx_activity_proj ON activity_events(project_id, created_at);
             "#
         )?;
         Ok(())
@@ -241,4 +252,64 @@ impl Database {
             Ok(None)
         }
     }
+
+    pub fn record_activity(
+        &self,
+        project_id: &str,
+        event_type: &str,
+        actor: &str,
+        summary_plain: &str,
+        details_json: Option<&str>,
+    ) -> Result<i64> {
+        let now = chrono::Utc::now().to_rfc3339();
+        self.conn.execute(
+            r#"
+            INSERT INTO activity_events (project_id, event_type, actor, summary_plain, details_json, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "#,
+            params![project_id, event_type, actor, summary_plain, details_json, now],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn list_activities(
+        &self,
+        project_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ActivityEvent>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, project_id, event_type, actor, summary_plain, details_json, created_at
+             FROM activity_events WHERE project_id = ?1 ORDER BY id DESC LIMIT ?2"
+        )?;
+        let rows = stmt.query_map(params![project_id, limit as i64], |row| {
+            Ok(ActivityEvent {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                event_type: row.get(2)?,
+                actor: row.get(3)?,
+                summary_plain: row.get(4)?,
+                details_json: row.get(5)?,
+                created_at: row.get(6)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            if let Ok(item) = r {
+                list.push(item);
+            }
+        }
+        Ok(list)
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ActivityEvent {
+    pub id: i64,
+    pub project_id: String,
+    pub event_type: String,
+    pub actor: String,
+    pub summary_plain: String,
+    pub details_json: Option<String>,
+    pub created_at: String,
 }
