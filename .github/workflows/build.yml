@@ -42,6 +42,11 @@ jobs:
       - name: Run CLI Headless Smoke Test
         run: cargo run -p devos-cli -- --smoke-test
 
+      - name: Run Comprehensive E2E Simulation Test
+        if: runner.os != 'Windows'
+        run: |
+          python3 scripts/test_e2e_comprehensive.py
+
   test-frontend:
     name: Frontend Build & Typecheck
     runs-on: ubuntu-latest

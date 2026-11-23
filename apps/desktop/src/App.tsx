@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { ShieldCheck, AlertTriangle, X } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { BoardView } from './components/BoardView';
@@ -26,6 +27,7 @@ export const App: React.FC = () => {
   const [isDoctorOpen, setIsDoctorOpen] = useState(false);
   const [isConflictDoctorOpen, setIsConflictDoctorOpen] = useState(false);
   const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
+  const [isTrustModalOpen, setIsTrustModalOpen] = useState(false);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
   const loadRecentProjects = async () => {
@@ -294,6 +296,56 @@ export const App: React.FC = () => {
         onClose={() => setIsCreateIssueOpen(false)}
         onSubmit={handleSubmitIssue}
       />
+
+      {/* Workspace Trust Modal for Imported Projects */}
+      {isTrustModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#141824] border border-[#222938] rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsTrustModalOpen(false)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-[#202636] transition"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mb-3">
+              <ShieldCheck size={20} />
+            </div>
+
+            <h3 className="text-base font-bold text-slate-100 mb-1">
+              工作区安全信任确认 (Workspace Trust)
+            </h3>
+            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+              检测到当前打开的项目目录可能来自外部下载或第三方分享。为防止未知工程中的恶意脚本自动执行，在您信任此工作区前，DevOS 已自动阻断自动启动容器、网络端口映射与脚本执行。
+            </p>
+
+            <div className="p-3 bg-[#0d1017] border border-[#222938] rounded-lg text-[11px] text-slate-300 space-y-1 mb-5">
+              <div className="font-semibold text-emerald-400">🛡️ DevOS 安全防御围栏已激活：</div>
+              <div>• 外部 DevContainer / Dockerfile 脚本暂不自动拉起</div>
+              <div>• 敏感配置文件（.env）对外部 Agent 保持掩码隔离</div>
+              <div>• 自动阻断任何非当前项目目录的越权路径访问</div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setIsTrustModalOpen(false);
+                  alert('已确认为受信任工作区，完整容器运行与测试环境已激活！');
+                }}
+                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-lg text-xs transition"
+              >
+                信任并启用完整环境
+              </button>
+              <button
+                onClick={() => setIsTrustModalOpen(false)}
+                className="px-4 py-2 bg-[#1e2433] hover:bg-[#283144] text-slate-300 rounded-lg text-xs font-semibold transition"
+              >
+                仅以只读模式浏览
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

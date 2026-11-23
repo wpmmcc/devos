@@ -458,7 +458,11 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                     plain_message: None,
                 })?;
                 let agent_name = arguments["agent_name"].as_str().unwrap_or("External Agent");
-                let session_id = std::env::var("DEVOS_SESSION_ID").unwrap_or_else(|_| "default_session".to_string());
+                let session_id = arguments["session_id"]
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .or_else(|| std::env::var("DEVOS_SESSION_ID").ok())
+                    .unwrap_or_else(|| "default_session".to_string());
                 let issue = IssueManager::claim_issue(&root, &project, issue_id, agent_name, &session_id)?;
                 Ok(serde_json::to_value(issue)?)
             }

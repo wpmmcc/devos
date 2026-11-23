@@ -11,16 +11,17 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 rusqlite = { workspace = true }
 thiserror = { workspace = true }
-anyhow = { workspace = true }
 tokio = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 notify = { workspace = true }
 dirs = { workspace = true }
-tempfile = { workspace = true }
 walkdir = { workspace = true }
 tracing = { workspace = true }
 toml_edit = { workspace = true }
 sha2 = { workspace = true }
 reqwest = { workspace = true }
 regex = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

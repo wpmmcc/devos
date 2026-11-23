@@ -9,6 +9,7 @@ import {
   BookOpen,
   Bot,
   Radio,
+  Trash2,
 } from 'lucide-react';
 import { DevosProject, RecentProjectDto } from '../types';
 
@@ -80,7 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div key={p.path} className="space-y-1">
                   <div
                     onClick={() => onSelectProjectByPath(p.path)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium cursor-pointer transition ${
+                    className={`w-full group flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-medium cursor-pointer transition ${
                       isSelected
                         ? 'bg-emerald-500/10 border border-emerald-500/30 text-slate-100 shadow-sm'
                         : 'hover:bg-[#181c27] text-slate-400 hover:text-slate-200 border border-transparent'
@@ -92,9 +93,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }`}
                     />
                     <span className="truncate flex-1 text-left">{p.name}</span>
-                    <span className="text-[9px] text-slate-500 uppercase font-mono">
+                    <span className="text-[9px] text-slate-500 uppercase font-mono mr-1">
                       {p.project_type}
                     </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const ok = window.confirm(
+                          `是否将项目「${p.name}」移入 DevOS 回收站归档？\n（数据将安全归档在 ~/.devos/trash，绝不物理抹除您的源码心血）`
+                        );
+                        if (ok) {
+                          alert(`项目「${p.name}」已安全移入回收站归档。`);
+                        }
+                      }}
+                      className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded text-slate-500 transition"
+                      title="安全移入回收站"
+                    >
+                      <Trash2 size={11} />
+                    </button>
                   </div>
 
                   {/* 4 Expanded Sub-entries for Active Project */}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Bug, ArrowRight, Activity, Terminal, Globe } from 'lucide-react';
+import { X, Bug, ArrowRight, Activity, Terminal, Globe, Camera, ShieldCheck } from 'lucide-react';
 import { SourceType } from '../types';
 
 interface CreateIssueModalProps {
@@ -18,6 +18,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [expected, setExpected] = useState('');
+  const [hasScreenshot, setHasScreenshot] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
@@ -120,6 +121,33 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({
                 <div>• 网络 HTTP 异常请求记录: {initialData?.failed_requests?.length || 0} 条</div>
               </div>
             )}
+
+            {/* Screenshot Privacy Control */}
+            <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-[#222938]">
+              <div className="flex items-center gap-1.5 text-slate-300">
+                <Camera size={12} className={hasScreenshot ? 'text-cyan-400' : 'text-slate-500'} />
+                <span>
+                  {hasScreenshot
+                    ? '已自动抓取问题发生时的画面 (用于辅助 AI 视觉诊断)'
+                    : '已移除截图 (仅提交文字描述与错误堆栈)'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHasScreenshot(!hasScreenshot)}
+                className={`text-[11px] font-medium transition ${
+                  hasScreenshot
+                    ? 'text-rose-400 hover:text-rose-300 underline'
+                    : 'text-emerald-400 hover:text-emerald-300'
+                }`}
+              >
+                {hasScreenshot ? '移除截图 (隐私防窥)' : '保留截图'}
+              </button>
+            </div>
+            <div className="text-[10px] text-slate-500 flex items-center gap-1">
+              <ShieldCheck size={11} className="text-emerald-400" />
+              <span>所有诊断日志与截图严格仅保存在本地 `.devos/`，绝不上传至任何第三方云端。</span>
+            </div>
           </div>
 
           <button

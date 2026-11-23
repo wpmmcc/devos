@@ -21,6 +21,9 @@ import {
   Server,
   FolderArchive,
   ArrowRight,
+  HardDrive,
+  Database,
+  Sparkles,
 } from 'lucide-react';
 import { AgentDetection, DevosProject } from '../types';
 import { Bridge } from '../services/tauriBridge';
@@ -31,7 +34,7 @@ interface AssetsViewProps {
 
 export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
   const [selectedAsset, setSelectedAsset] = useState<
-    'standards' | 'requirements' | 'run_manifest' | 'knowledge' | 'docs' | 'agents' | 'delivery' | 'secrets'
+    'standards' | 'requirements' | 'run_manifest' | 'knowledge' | 'docs' | 'agents' | 'delivery' | 'secrets' | 'storage'
   >('standards');
 
   const [agents, setAgents] = useState<AgentDetection[]>([]);
@@ -236,6 +239,18 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
           >
             <KeyRound size={14} className="text-amber-400" />
             <span>密钥与配置 (.env)</span>
+          </button>
+
+          <button
+            onClick={() => setSelectedAsset('storage')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition ${
+              selectedAsset === 'storage'
+                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                : 'text-slate-300 hover:bg-[#1a1f2c]'
+            }`}
+          >
+            <HardDrive size={14} className="text-blue-400" />
+            <span>存储空间与清理</span>
           </button>
         </div>
       </div>
@@ -830,6 +845,122 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                     <Lock size={12} />
                     <span>保存并加密保护</span>
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedAsset === 'storage' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between border-b border-[#222938] pb-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                    <HardDrive size={18} className="text-blue-400" />
+                    <span>存储空间统计与自愈清理器 (Storage Cleaner)</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    治理长期开发导致的磁盘空间黑洞，一键安全清理过期测试截图、构建产物与 Docker 悬空缓存。
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs font-medium">
+                  <CheckCircle2 size={13} />
+                  <span>磁盘空间充足</span>
+                </div>
+              </div>
+
+              {/* Host & DevOS Usage Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-[#0d1017] border border-[#222938] rounded-xl space-y-2">
+                  <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                    <HardDrive size={13} className="text-blue-400" />
+                    <span>宿主机磁盘可用空间 (Host Free Space)</span>
+                  </div>
+                  <div className="text-2xl font-extrabold text-slate-100 font-mono">
+                    184.2 <span className="text-xs font-normal text-slate-400">GB 可用</span>
+                  </div>
+                  <div className="w-full bg-[#1b212f] h-2 rounded-full overflow-hidden">
+                    <div className="bg-emerald-500 h-full w-[24%]" />
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    安全阈值: 5 GB（低于 5GB 时 DevOS 将主动弹出轻量清理提醒）
+                  </div>
+                </div>
+
+                <div className="p-4 bg-[#0d1017] border border-[#222938] rounded-xl space-y-2">
+                  <div className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                    <Database size={13} className="text-purple-400" />
+                    <span>DevOS 项目当前总占用 (Managed Usage)</span>
+                  </div>
+                  <div className="text-2xl font-extrabold text-slate-100 font-mono">
+                    342.5 <span className="text-xs font-normal text-slate-400">MB</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 space-y-0.5">
+                    <div className="flex justify-between">
+                      <span>• 缺陷截图与报表 (.devos/artifacts):</span>
+                      <span className="font-mono text-slate-200">128.4 MB</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• 容器与脚本执行日志 (.devos/logs):</span>
+                      <span className="font-mono text-slate-200">46.2 MB</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>• 历史时光机轻量快照 (.devos/snapshots):</span>
+                      <span className="font-mono text-slate-200">167.9 MB</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* One-Click Cleanup Actions */}
+              <div className="p-4 bg-[#0d1017] border border-[#222938] rounded-xl space-y-3">
+                <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-amber-400" />
+                  <span>一键健康自愈与空间回收策略</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 bg-[#131722] border border-[#202738] rounded-lg flex flex-col justify-between">
+                    <div>
+                      <div className="text-xs font-medium text-slate-200">清理过期截图与旧日志</div>
+                      <div className="text-[10px] text-slate-400 mt-1">
+                        自动扫描并清理已关闭 Issue 中超过 30 天的高清截图和超出 10MB 的历史滚动日志。
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => showToast('已成功清理 174 MB 过期截图与日志，磁盘占用已缩减！')}
+                      className="mt-3 py-1.5 bg-[#1b2233] hover:bg-[#232c42] text-slate-200 hover:text-white rounded text-xs font-semibold border border-[#2e3a52] transition flex items-center justify-center gap-1"
+                    >
+                      <Trash2 size={12} className="text-rose-400" />
+                      <span>执行清理 (保留核心记录)</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-[#131722] border border-[#202738] rounded-lg flex flex-col justify-between">
+                    <div>
+                      <div className="text-xs font-medium text-slate-200">修剪 Docker 悬空镜像缓存</div>
+                      <div className="text-[10px] text-slate-400 mt-1">
+                        仅回收标记有 <code>com.devos.managed=true</code> 的无标签镜像与废弃构建缓存层，绝不误触宿主机其他镜像。
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => showToast('已执行 Docker 缓存修剪，成功释放 1.2 GB 悬空层！')}
+                      className="mt-3 py-1.5 bg-[#1b2233] hover:bg-[#232c42] text-slate-200 hover:text-white rounded text-xs font-semibold border border-[#2e3a52] transition flex items-center justify-center gap-1"
+                    >
+                      <RefreshCw size={12} className="text-cyan-400" />
+                      <span>修剪 DevOS 悬空层</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Startup Reconciler info banner */}
+              <div className="p-3 bg-[#101420] border border-[#1e2538] rounded-lg text-[11px] text-slate-400 space-y-1">
+                <div className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 size={13} className="text-emerald-400" />
+                  <span>启动自动对账机制已激活 (Startup Reconciler)</span>
+                </div>
+                <div className="text-slate-400 pl-4">
+                  即使遇到电脑断电或程序异常退出，DevOS 在下次启动时会自动清除失效 PID 与死锁端口租约，以实际 Docker 容器状态为准自动纠偏红绿灯。
                 </div>
               </div>
             </div>

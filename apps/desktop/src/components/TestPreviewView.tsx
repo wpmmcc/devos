@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import QRCode from 'qrcode';
 import {
   Globe,
   Terminal,
@@ -14,6 +15,11 @@ import {
   Camera,
   Save,
   Power,
+  QrCode,
+  Smartphone,
+  X,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { BoardCard, DevosProject, RunManifest, RunTarget, ScriptContext } from '../types';
 import { devosProbe } from '../utils/probe';
@@ -72,6 +78,15 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
   };
 
   const [isSnapshotting, setIsSnapshotting] = useState(false);
+  const [isLanModalOpen, setIsLanModalOpen] = useState(false);
+  const [lanUrl, setLanUrl] = useState('http://192.168.1.108:8080');
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [isCopiedLan, setIsCopiedLan] = useState(false);
+
+  const openLanModal = () => {
+    setIsLanModalOpen(true);
+    QRCode.toDataURL(lanUrl, { width: 180, margin: 1 }).then(setQrDataUrl).catch(() => {});
+  };
 
   const handleCreateSnapshot = async () => {
     const name = window.prompt('请输入快照名称（如 baseline_v1）：', '');
@@ -143,6 +158,15 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
         <div className="flex items-center gap-2">
           {mode === 'web' && (
             <>
+              <button
+                onClick={openLanModal}
+                className="flex items-center gap-1.5 px-3 py-1 bg-[#1a2130] hover:bg-[#232b3d] text-cyan-300 hover:text-white rounded-md text-xs font-medium border border-cyan-800/40 transition"
+                title="局域网真机扫码预览"
+              >
+                <QrCode size={13} className="text-cyan-400" />
+                <span>局域网真机预览</span>
+              </button>
+
               <button
                 onClick={handleCreateSnapshot}
                 disabled={isSnapshotting}
@@ -431,6 +455,61 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                 请从左侧选择一个要测试的任务
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* LAN Preview & QR Code Modal */}
+      {isLanModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-[#141824] border border-[#222938] rounded-2xl max-w-sm w-full p-6 shadow-2xl relative text-center">
+            <button
+              onClick={() => setIsLanModalOpen(false)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-[#202636] transition"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="w-10 h-10 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center mx-auto mb-3">
+              <Smartphone size={20} />
+            </div>
+
+            <h3 className="text-base font-bold text-slate-100 mb-1">局域网真机扫码预览</h3>
+            <p className="text-xs text-slate-400 mb-4">
+              确保手机与电脑连接同一 Wi-Fi，打开微信或系统相机即可扫码直接测试页面。
+            </p>
+
+            {qrDataUrl ? (
+              <div className="bg-white p-3 rounded-xl inline-block shadow-lg mb-4">
+                <img src={qrDataUrl} alt="LAN QR Code" className="w-44 h-44 object-contain mx-auto" />
+              </div>
+            ) : (
+              <div className="w-44 h-44 bg-[#0f1118] border border-dashed border-slate-700 rounded-xl flex items-center justify-center mx-auto mb-4 text-xs text-slate-500">
+                生成二维码中...
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 bg-[#0d1017] border border-[#222938] rounded-lg p-2 text-xs mb-4">
+              <span className="text-slate-400 font-mono text-[11px] truncate flex-1">{lanUrl}</span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(lanUrl);
+                  setIsCopiedLan(true);
+                  setTimeout(() => setIsCopiedLan(false), 2000);
+                }}
+                className="p-1.5 hover:bg-[#202636] rounded text-slate-300 transition"
+                title="复制地址"
+              >
+                {isCopiedLan ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+              </button>
+            </div>
+
+            <button
+              onClick={() => setIsLanModalOpen(false)}
+              className="w-full py-2 bg-[#1e2433] hover:bg-[#283144] text-slate-200 rounded-lg text-xs font-semibold transition"
+            >
+              关闭
+            </button>
           </div>
         </div>
       )}
