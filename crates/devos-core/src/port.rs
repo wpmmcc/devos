@@ -1,7 +1,7 @@
-use std::net::TcpListener;
-use std::process::Command;
 use crate::db::Database;
 use crate::error::{DevosError, Result};
+use std::net::TcpListener;
+use std::process::Command;
 
 pub struct PortRegistry;
 
@@ -44,9 +44,15 @@ impl PortRegistry {
         }
         Err(DevosError::Custom {
             code: "NO_PORT_AVAILABLE".to_string(),
-            message: format!("No available port found in range {}-{}", start_port, end_port),
+            message: format!(
+                "No available port found in range {}-{}",
+                start_port, end_port
+            ),
             hint: Some("Check and terminate running background services.".to_string()),
-            plain_message: Some(format!("在端口范围 {}-{} 内未找到可用空闲端口", start_port, end_port)),
+            plain_message: Some(format!(
+                "在端口范围 {}-{} 内未找到可用空闲端口",
+                start_port, end_port
+            )),
         })
     }
 
@@ -104,7 +110,8 @@ impl PortRegistry {
                                     .args(["-p", &p.to_string(), "-o", "command="])
                                     .output()
                                 {
-                                    let c = String::from_utf8_lossy(&ps_out.stdout).trim().to_string();
+                                    let c =
+                                        String::from_utf8_lossy(&ps_out.stdout).trim().to_string();
                                     if !c.is_empty() {
                                         cmdline = Some(c);
                                     }
@@ -252,7 +259,10 @@ impl PortRegistry {
                         "Port {} is already registered by DevOS project '{}' for service '{}'",
                         port, other_proj, service
                     ),
-                    hint: Some(format!("Stop project '{}' or reconfigure its port in devos.json", other_proj)),
+                    hint: Some(format!(
+                        "Stop project '{}' or reconfigure its port in devos.json",
+                        other_proj
+                    )),
                     plain_message: Some(format!(
                         "端口 {} 已被 DevOS 项目 '{}' 的 {} 服务占用，请先停止该项目或更换端口",
                         port, other_proj, service

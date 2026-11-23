@@ -1,12 +1,12 @@
+use crate::error::{DevosError, Result};
+use crate::fs_utils::{atomic_write_json, read_json};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use crate::error::{DevosError, Result};
-use crate::fs_utils::{atomic_write_json, read_json};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -79,10 +79,22 @@ impl Default for MirrorsConfig {
         );
 
         let mut container_env = HashMap::new();
-        container_env.insert("NPM_CONFIG_REGISTRY".to_string(), "https://registry.npmmirror.com".to_string());
-        container_env.insert("PIP_INDEX_URL".to_string(), "https://pypi.tuna.tsinghua.edu.cn/simple".to_string());
-        container_env.insert("GOPROXY".to_string(), "https://goproxy.cn,direct".to_string());
-        container_env.insert("RUSTUP_DIST_SERVER".to_string(), "https://rsproxy.cn".to_string());
+        container_env.insert(
+            "NPM_CONFIG_REGISTRY".to_string(),
+            "https://registry.npmmirror.com".to_string(),
+        );
+        container_env.insert(
+            "PIP_INDEX_URL".to_string(),
+            "https://pypi.tuna.tsinghua.edu.cn/simple".to_string(),
+        );
+        container_env.insert(
+            "GOPROXY".to_string(),
+            "https://goproxy.cn,direct".to_string(),
+        );
+        container_env.insert(
+            "RUSTUP_DIST_SERVER".to_string(),
+            "https://rsproxy.cn".to_string(),
+        );
 
         let docker_mirrors = vec![
             "https://dockerproxy.com".to_string(),
@@ -305,12 +317,18 @@ impl MirrorManager {
         let mut downloaded = if is_partial { existing_bytes } else { 0 };
         let start_time = Instant::now();
 
-        while let Some(chunk) = resp.chunk().await.map_err(|e| DevosError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))? {
+        while let Some(chunk) = resp
+            .chunk()
+            .await
+            .map_err(|e| DevosError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?
+        {
             file.write_all(&chunk).map_err(DevosError::Io)?;
             downloaded += chunk.len() as u64;
 
             let elapsed_sec = start_time.elapsed().as_secs_f32().max(0.1);
-            let speed_kb = ((downloaded - if is_partial { existing_bytes } else { 0 }) as f32 / 1024.0) / elapsed_sec;
+            let speed_kb = ((downloaded - if is_partial { existing_bytes } else { 0 }) as f32
+                / 1024.0)
+                / elapsed_sec;
             let percent = if total_bytes > 0 {
                 (downloaded as f32 / total_bytes as f32) * 100.0
             } else {
@@ -318,7 +336,11 @@ impl MirrorManager {
             };
 
             on_progress(DownloadProgress {
-                tool_id: dest.file_name().and_then(|f| f.to_str()).unwrap_or("tool").to_string(),
+                tool_id: dest
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .unwrap_or("tool")
+                    .to_string(),
                 bytes_downloaded: downloaded,
                 total_bytes,
                 percent,
@@ -348,7 +370,11 @@ impl MirrorManager {
         }
 
         on_progress(DownloadProgress {
-            tool_id: dest.file_name().and_then(|f| f.to_str()).unwrap_or("tool").to_string(),
+            tool_id: dest
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("tool")
+                .to_string(),
             bytes_downloaded: downloaded,
             total_bytes,
             percent: 100.0,
@@ -361,7 +387,10 @@ impl MirrorManager {
     }
 
     /// Import a locally downloaded archive or binary directly into ~/.devos/bin/
-    pub fn import_local_archive<P: AsRef<Path>>(tool_name: &str, source_path: P) -> Result<PathBuf> {
+    pub fn import_local_archive<P: AsRef<Path>>(
+        tool_name: &str,
+        source_path: P,
+    ) -> Result<PathBuf> {
         let src = source_path.as_ref();
         if !src.exists() {
             return Err(DevosError::Custom {

@@ -1,7 +1,8 @@
 use devos_core::{
-    ensure_within_root, fs_utils::read_json, AgentConfigManager, BoardManager, Database, DevosError,
-    Guardrails, IssueManager, PortOccupant, PortRegistry, ProjectChangeEvent, ProjectManager,
-    ProjectWatcher, Result,
+    ensure_within_root, fs_utils::read_json, AgentConfigManager, BoardManager, Checkpoint,
+    CheckpointManager, Database, DevosError, Guardrails, IssueManager, PortOccupant, PortRegistry,
+    ProjectChangeEvent, ProjectManager, ProjectWatcher, ReleaseBuildResult, ReleaseManager, Result,
+    StorageCleaner, StorageReport,
 };
 use devos_env::{
     DdevDriver, DevcontainerDriver, DiagnosticItem, EnvDriver, EnvStatus, PreflightDoctor,
@@ -402,19 +403,30 @@ fn execute_script_target(
     to_api_resp(res)
 }
 
-fn with_env_lock<F, R>(locks_state: &State<'_, ActiveEnvLocks>, project_root: &Path, f: F) -> Result<R>
+fn with_env_lock<F, R>(
+    locks_state: &State<'_, ActiveEnvLocks>,
+    project_root: &Path,
+    f: F,
+) -> Result<R>
 where
     F: FnOnce() -> Result<R>,
 {
-    let canonical = project_root.canonicalize().unwrap_or_else(|_| project_root.to_path_buf());
+    let canonical = project_root
+        .canonicalize()
+        .unwrap_or_else(|_| project_root.to_path_buf());
     {
         let mut locks = locks_state.0.lock().unwrap();
         if locks.contains(&canonical) {
             return Err(DevosError::Custom {
                 code: "ENV_BUSY".to_string(),
-                message: "An environment operation is already in progress for this project".to_string(),
-                hint: Some("Please wait for the current environment operation to complete.".to_string()),
-                plain_message: Some("该项目环境正在执行其他操作（启动/停止/快照），请稍候...".to_string()),
+                message: "An environment operation is already in progress for this project"
+                    .to_string(),
+                hint: Some(
+                    "Please wait for the current environment operation to complete.".to_string(),
+                ),
+                plain_message: Some(
+                    "该项目环境正在执行其他操作（启动/停止/快照），请稍候...".to_string(),
+                ),
             });
         }
         locks.insert(canonical.clone());
@@ -569,7 +581,10 @@ fn reconfigure_web_ports(
             devos_core::atomic_write_json(root.join("devos.json"), &project)?;
         }
 
-        Ok(format!("端口已切换并更新至 HTTP: {}, HTTPS: {}", http_port, https_port))
+        Ok(format!(
+            "端口已切换并更新至 HTTP: {}, HTTPS: {}",
+            http_port, https_port
+        ))
     })();
     to_api_resp(res)
 }
@@ -644,8 +659,92 @@ fn import_local_tool_package(tool_name: String, source_path: String) -> ApiRespo
 #[tauri::command]
 fn export_diagnostic_bundle(project_path: Option<String>) -> ApiResponse<String> {
     let p_root = project_path.as_deref().map(Path::new);
-    let res = devos_core::export_diagnostic_bundle(p_root)
-        .map(|p| p.display().to_string());
+    let res = devos_core::export_diagnostic_bundle(p_root).map(|p| p.display().to_string());
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn export_release_bundle(
+    project_path: String,
+    version: String,
+    panel_friendly: bool,
+) -> ApiResponse<ReleaseBuildResult> {
+    let res = (|| -> Result<ReleaseBuildResult> {
+        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        ReleaseManager::prepare_release_artifacts(&root, &project, &version, panel_friendly)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn list_vcs_checkpoints(project_path: String) -> ApiResponse<Vec<Checkpoint>> {
+    let res = (|| -> Result<Vec<Checkpoint>> {
+        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        CheckpointManager::list_checkpoints(&root)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn create_vcs_checkpoint(
+    project_path: String,
+    note: String,
+    source: String,
+) -> ApiResponse<Checkpoint> {
+    let res = (|| -> Result<Checkpoint> {
+        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let src = if source.trim().is_empty() {
+            "user_manual"
+        } else {
+            &source
+        };
+        CheckpointManager::create_checkpoint(&root, &note, src)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn restore_vcs_checkpoint(project_path: String, checkpoint_id: String) -> ApiResponse<bool> {
+    let res = (|| -> Result<bool> {
+        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        CheckpointManager::restore_checkpoint(&root, &checkpoint_id).map(|_| true)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn get_storage_report(project_path: String) -> ApiResponse<StorageReport> {
+    let res = (|| -> Result<StorageReport> {
+        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        Ok(StorageCleaner::calculate_storage_usage(&root))
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn clean_storage(
+    project_path: String,
+    older_than_days: u64,
+    prune_docker: bool,
+) -> ApiResponse<u64> {
+    let res = (|| -> Result<u64> {
+        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let freed = StorageCleaner::clean_expired_artifacts(&root, older_than_days)?;
+        if prune_docker {
+            let _ = StorageCleaner::prune_managed_docker_cache();
+        }
+        Ok(freed)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn trash_project(project_path: String) -> ApiResponse<String> {
+    let res = (|| -> Result<String> {
+        let db = Database::open_global().ok();
+        let dest = ProjectManager::trash_project(&project_path, db.as_ref())?;
+        Ok(dest.display().to_string())
+    })();
     to_api_resp(res)
 }
 
@@ -691,7 +790,14 @@ pub fn run() {
             save_mirrors_config,
             race_mirrors_speed,
             import_local_tool_package,
-            export_diagnostic_bundle
+            export_diagnostic_bundle,
+            export_release_bundle,
+            list_vcs_checkpoints,
+            create_vcs_checkpoint,
+            restore_vcs_checkpoint,
+            get_storage_report,
+            clean_storage,
+            trash_project
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

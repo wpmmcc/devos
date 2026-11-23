@@ -1,7 +1,7 @@
+use crate::error::{DevosError, Result};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use crate::error::{DevosError, Result};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProjectChangeEvent {
@@ -44,26 +44,36 @@ impl ProjectWatcher {
                         }
 
                         // Suppress echo loops from DevOS's own atomic writes (within 600ms)
-                        if crate::fs_utils::is_self_write_echo(&path, std::time::Duration::from_millis(600)) {
+                        if crate::fs_utils::is_self_write_echo(
+                            &path,
+                            std::time::Duration::from_millis(600),
+                        ) {
                             continue;
                         }
 
                         let relative = path.strip_prefix(&root_path).unwrap_or(&path);
                         let rel_str = relative.to_string_lossy();
 
-                        let change_type = if rel_str.starts_with("board/") && rel_str.ends_with(".json") {
-                            let card_id = path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string());
-                            ProjectChangeEvent::BoardUpdated { card_id }
-                        } else if rel_str.starts_with("issues/") && rel_str.ends_with(".json") {
-                            let issue_id = path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string());
-                            ProjectChangeEvent::IssueUpdated { issue_id }
-                        } else if rel_str == "devos.json" || rel_str == "devos.run.json" {
-                            ProjectChangeEvent::ManifestUpdated
-                        } else if rel_str.starts_with("standards/") {
-                            ProjectChangeEvent::StandardUpdated
-                        } else {
-                            ProjectChangeEvent::Other
-                        };
+                        let change_type =
+                            if rel_str.starts_with("board/") && rel_str.ends_with(".json") {
+                                let card_id = path
+                                    .file_stem()
+                                    .and_then(|s| s.to_str())
+                                    .map(|s| s.to_string());
+                                ProjectChangeEvent::BoardUpdated { card_id }
+                            } else if rel_str.starts_with("issues/") && rel_str.ends_with(".json") {
+                                let issue_id = path
+                                    .file_stem()
+                                    .and_then(|s| s.to_str())
+                                    .map(|s| s.to_string());
+                                ProjectChangeEvent::IssueUpdated { issue_id }
+                            } else if rel_str == "devos.json" || rel_str == "devos.run.json" {
+                                ProjectChangeEvent::ManifestUpdated
+                            } else if rel_str.starts_with("standards/") {
+                                ProjectChangeEvent::StandardUpdated
+                            } else {
+                                ProjectChangeEvent::Other
+                            };
 
                         if change_type != ProjectChangeEvent::Other {
                             callback(change_type, path);

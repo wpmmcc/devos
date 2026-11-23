@@ -266,44 +266,53 @@ def test_3_mcp_10_tools_and_session_jail(proj_dir: Path):
     proc.terminate()
 
 def test_4_universal_bundle_exporter(proj_dir: Path):
-    log_step("4. Universal Bundle Exporter & Release Gates")
-    # Simulate release preparation
+    log_step("4. Universal Bundle Exporter, VCS Checkpoints & Storage Clean CLI")
+
+    # 1. Test CLI Checkpoint Create and List
+    cp_create_res = run_cmd([str(CLI_BIN), "checkpoint", "create", "--note", "E2E Checkpoint Snapshot", "--project-dir", str(proj_dir), "--json"])
+    cp_create_data = json.loads(cp_create_res.stdout)
+    assert cp_create_data["ok"] is True, f"Failed to create checkpoint: {cp_create_res.stdout}"
+    print(f"   ✓ CLI checkpoint created: {cp_create_data['data']['id']}")
+
+    cp_list_res = run_cmd([str(CLI_BIN), "checkpoint", "list", "--project-dir", str(proj_dir), "--json"])
+    cp_list_data = json.loads(cp_list_res.stdout)
+    assert cp_list_data["ok"] is True
+    assert len(cp_list_data["data"]) >= 1
+    print(f"   ✓ CLI checkpoints listed: {len(cp_list_data['data'])} total")
+
+    # 2. Test CLI Storage Usage Report & Clean
+    clean_stat_res = run_cmd([str(CLI_BIN), "clean", "--status", "--project-dir", str(proj_dir), "--json"])
+    clean_stat_data = json.loads(clean_stat_res.stdout)
+    assert clean_stat_data["ok"] is True
+    print(f"   ✓ CLI storage report: host free {clean_stat_data['data']['host_available_gb']} GB")
+
+    clean_run_res = run_cmd([str(CLI_BIN), "clean", "--days", "30", "--project-dir", str(proj_dir), "--json"])
+    clean_run_data = json.loads(clean_run_res.stdout)
+    assert clean_run_data["ok"] is True
+    print("   ✓ CLI storage cleanup executed successfully")
+
+    # 3. Test CLI Project Workspace Path Validation
+    proj_val_res = run_cmd([str(CLI_BIN), "project", "validate", "--path", str(proj_dir), "--json"])
+    proj_val_data = json.loads(proj_val_res.stdout)
+    assert proj_val_data["ok"] is True
+    print(f"   ✓ CLI project path validation: valid={proj_val_data['data']['valid']}")
+
+    # 4. Test Universal Release Bundle Generation (Real DevOS Core ReleaseManager via CLI)
+    bundle_res = run_cmd([str(CLI_BIN), "bundle", "--version", "v1.0.0", "--panel-friendly", "--project-dir", str(proj_dir), "--json"])
+    bundle_data = json.loads(bundle_res.stdout)
+    assert bundle_data["ok"] is True, f"Bundle export failed: {bundle_res.stdout}"
+    
+    release_info = bundle_data["data"]
+    assert release_info["version"] == "v1.0.0"
     releases_dir = proj_dir / "releases" / "v1.0.0"
-    releases_dir.mkdir(parents=True, exist_ok=True)
+    assert releases_dir.exists(), "Releases dir must exist"
+    assert (releases_dir / "DEPLOY.md").exists(), "DEPLOY.md must exist in release"
+    assert (releases_dir / ".env.prod.example").exists(), ".env.prod.example must exist"
+    assert (releases_dir / "deploy" / "docker-compose.prod.yml").exists(), "docker-compose.prod.yml must exist"
 
-    manifest_file = releases_dir / "release-manifest.json"
-    manifest_data = {
-        "manifest_version": "1.0",
-        "version": "v1.0.0",
-        "created_at": "2026-11-23T18:00:00Z",
-        "app_name": "e2e-invoice-app",
-        "panel_friendly": True,
-        "entrypoints": {
-            "web_url": "http://localhost:8080",
-            "health_path": "/health"
-        },
-        "preflight_gates_passed": {
-            "git_clean": True,
-            "secret_leak_clean": True,
-            "env_complete": True,
-            "compose_valid": True
-        }
-    }
-    with open(manifest_file, "w", encoding="utf-8") as f:
-        json.dump(manifest_data, f, indent=2)
-
-    deploy_doc = releases_dir / "DEPLOY.md"
-    deploy_doc.write_text("# 生产部署指南\n\n1. 复制 .env.prod.example 为 .env.prod\n2. 执行 docker compose up -d\n", encoding="utf-8")
-
-    deploy_dir = releases_dir / "deploy"
-    deploy_dir.mkdir(exist_ok=True)
-    (deploy_dir / "docker-compose.prod.yml").write_text("version: '3.8'\nservices:\n  app:\n    image: nginx:alpine\n", encoding="utf-8")
-
-    # Create zip archive
-    zip_path = proj_dir / "releases" / "e2e-invoice-app-v1.0.0.zip"
-    shutil.make_archive(str(zip_path).replace(".zip", ""), "zip", releases_dir)
-    assert zip_path.exists(), "Release zip bundle must exist"
-    print(f"   ✓ Standard bundle generated with release-manifest.json, DEPLOY.md, and standalone zip ({zip_path.stat().st_size} bytes)")
+    zip_file = proj_dir / "releases" / "e2e-invoice-app-v1.0.0.zip"
+    assert zip_file.exists(), f"Release zip archive must exist at {zip_file}"
+    print(f"   ✓ Standard bundle generated with DEPLOY.md, compose, and standalone zip ({zip_file.stat().st_size} bytes)")
 
 def test_5_desktop_frontend_build():
     log_step("5. Desktop Frontend (Vite + React) Compilation Verification")

@@ -1,13 +1,11 @@
-use std::path::{Path, PathBuf};
-use std::fs;
-use devos_schema::{
-    BoardCard, DevosProject, Issue, ProjectMode, ProjectType, RunManifest,
-};
 use crate::board::BoardManager;
 use crate::db::Database;
 use crate::error::{DevosError, Result};
 use crate::fs_utils::{atomic_write, atomic_write_json, read_json};
 use crate::issue::IssueManager;
+use devos_schema::{BoardCard, DevosProject, Issue, ProjectMode, ProjectType, RunManifest};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 pub const DEVOS_MANAGED_LABEL: &str = "com.devos.managed=true";
 
@@ -22,7 +20,11 @@ impl ProjectManager {
         } else {
             project_id.chars().take(4).collect::<String>()
         };
-        let short_hash = if hash.len() >= 4 { hash } else { "0001".to_string() };
+        let short_hash = if hash.len() >= 4 {
+            hash
+        } else {
+            "0001".to_string()
+        };
         format!("devos-{}-{}", clean_slug, short_hash)
     }
 
@@ -99,7 +101,8 @@ impl ProjectManager {
             project_type = project_type,
         );
         atomic_write(
-            root.join(&project.workspace_paths.standards).join("01-general-standards.md"),
+            root.join(&project.workspace_paths.standards)
+                .join("01-general-standards.md"),
             general_standards,
         )?;
 
@@ -258,7 +261,13 @@ impl ProjectManager {
         let mut warnings = Vec::new();
 
         // 1. Check for cloud sync directories
-        let cloud_patterns = ["OneDrive", "iCloud", "BaiduNetdisk", "Dropbox", "Google Drive"];
+        let cloud_patterns = [
+            "OneDrive",
+            "iCloud",
+            "BaiduNetdisk",
+            "Dropbox",
+            "Google Drive",
+        ];
         for cp in cloud_patterns {
             if path_str.contains(cp) {
                 warnings.push(format!(
@@ -275,19 +284,28 @@ impl ProjectManager {
 
         // 3. Check for non-ASCII (e.g. Chinese characters)
         if !path_str.is_ascii() {
-            warnings.push("路径包含中文字符，非英语字符可能导致部分 CLI 工具和旧版 Docker 解析乱码。".to_string());
+            warnings.push(
+                "路径包含中文字符，非英语字符可能导致部分 CLI 工具和旧版 Docker 解析乱码。"
+                    .to_string(),
+            );
         }
 
         // 4. Check for length (> 200)
         if path_str.len() > 200 {
-            warnings.push("路径层级过深（长度超过 200 字符），可能在 Windows 环境下触发 MAX_PATH 限制。".to_string());
+            warnings.push(
+                "路径层级过深（长度超过 200 字符），可能在 Windows 环境下触发 MAX_PATH 限制。"
+                    .to_string(),
+            );
         }
 
         warnings
     }
 
     /// Create a zero-wait interactive demo project for first-time onboarding
-    pub fn init_demo_project<P: AsRef<Path>>(target_dir: P, db: Option<&Database>) -> Result<DevosProject> {
+    pub fn init_demo_project<P: AsRef<Path>>(
+        target_dir: P,
+        db: Option<&Database>,
+    ) -> Result<DevosProject> {
         let root = target_dir.as_ref();
         let project = Self::init_project(
             root,
@@ -325,5 +343,35 @@ impl ProjectManager {
         );
 
         Ok(project)
+    }
+
+    /// Soft delete / trash a project by moving it to ~/.devos/trash/<timestamp>_<slug>
+    pub fn trash_project<P: AsRef<Path>>(project_dir: P, db: Option<&Database>) -> Result<PathBuf> {
+        let p = project_dir.as_ref();
+        if !p.exists() {
+            return Err(DevosError::ProjectNotFound {
+                path: p.display().to_string(),
+            });
+        }
+        let slug = if let Ok((_, proj)) = Self::find_and_load(p) {
+            proj.slug
+        } else {
+            p.file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string()
+        };
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let trash_dir = home.join(".devos").join("trash");
+        fs::create_dir_all(&trash_dir)?;
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+        let dest_name = format!("{}_{}", timestamp, slug);
+        let dest_path = trash_dir.join(dest_name);
+        fs::rename(p, &dest_path)?;
+
+        if let Some(database) = db {
+            let _ = database.remove_recent_project(&p.display().to_string());
+        }
+        Ok(dest_path)
     }
 }

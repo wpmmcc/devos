@@ -247,7 +247,9 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                         for e in entries.flatten().take(5) {
                             if let Ok(content) = std::fs::read_to_string(e.path()) {
                                 if let Some(first_line) = content.lines().next() {
-                                    knowledge_titles.push(first_line.trim_start_matches('#').trim().to_string());
+                                    knowledge_titles.push(
+                                        first_line.trim_start_matches('#').trim().to_string(),
+                                    );
                                 }
                             }
                         }
@@ -313,12 +315,15 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                         Ok(json!({ "stopped": true }))
                     }
                     "exec" => {
-                        let cmd = arguments["command"].as_str().ok_or_else(|| DevosError::Custom {
-                            code: "MISSING_COMMAND".to_string(),
-                            message: "Missing 'command' argument".to_string(),
-                            hint: None,
-                            plain_message: None,
-                        })?;
+                        let cmd =
+                            arguments["command"]
+                                .as_str()
+                                .ok_or_else(|| DevosError::Custom {
+                                    code: "MISSING_COMMAND".to_string(),
+                                    message: "Missing 'command' argument".to_string(),
+                                    hint: None,
+                                    plain_message: None,
+                                })?;
                         let exec_res = driver.exec(&root, cmd, 60, &[])?;
                         Ok(serde_json::to_value(exec_res)?)
                     }
@@ -353,43 +358,31 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                 };
                 let note = arguments["note"].as_str().map(|s| s.to_string());
                 let card = BoardManager::upsert_card(
-                    &root,
-                    &project,
-                    card_id,
-                    title,
-                    col,
-                    "agent",
-                    None,
-                    note,
+                    &root, &project, card_id, title, col, "agent", None, note,
                 )?;
                 Ok(serde_json::to_value(card)?)
             }
 
             "submit_for_testing" => {
-                let card_id = arguments["card_id"].as_str().ok_or_else(|| DevosError::Custom {
-                    code: "MISSING_CARD_ID".to_string(),
-                    message: "card_id is required".to_string(),
-                    hint: None,
-                    plain_message: None,
-                })?;
+                let card_id = arguments["card_id"]
+                    .as_str()
+                    .ok_or_else(|| DevosError::Custom {
+                        code: "MISSING_CARD_ID".to_string(),
+                        message: "card_id is required".to_string(),
+                        hint: None,
+                        plain_message: None,
+                    })?;
                 let summary = arguments["summary_plain"].as_str().unwrap_or("功能提测");
-                let steps: Vec<ChecklistStep> = serde_json::from_value(
-                    arguments["test_checklist"].clone()
-                ).unwrap_or_default();
-                let targets: Vec<String> = serde_json::from_value(
-                    arguments["run_target_ids"].clone()
-                ).unwrap_or_default();
+                let steps: Vec<ChecklistStep> =
+                    serde_json::from_value(arguments["test_checklist"].clone()).unwrap_or_default();
+                let targets: Vec<String> =
+                    serde_json::from_value(arguments["run_target_ids"].clone()).unwrap_or_default();
 
                 // Check smoke & requirements before submission
                 devos_core::Guardrails::check_smoke_before_testing(&root, &project)?;
 
                 let card = BoardManager::submit_for_testing(
-                    &root,
-                    &project,
-                    card_id,
-                    summary,
-                    steps,
-                    targets,
+                    &root, &project, card_id, summary, steps, targets,
                 )?;
                 Ok(serde_json::to_value(card)?)
             }
@@ -401,16 +394,18 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
             }
 
             "resolve_issue" => {
-                let issue_id = arguments["issue_id"].as_str().ok_or_else(|| DevosError::Custom {
-                    code: "MISSING_ISSUE_ID".to_string(),
-                    message: "issue_id is required".to_string(),
-                    hint: None,
-                    plain_message: None,
-                })?;
+                let issue_id =
+                    arguments["issue_id"]
+                        .as_str()
+                        .ok_or_else(|| DevosError::Custom {
+                            code: "MISSING_ISSUE_ID".to_string(),
+                            message: "issue_id is required".to_string(),
+                            hint: None,
+                            plain_message: None,
+                        })?;
                 let fix_summary = arguments["fix_summary_plain"].as_str().unwrap_or("");
-                let changed_files: Vec<String> = serde_json::from_value(
-                    arguments["changed_files"].clone()
-                ).unwrap_or_default();
+                let changed_files: Vec<String> =
+                    serde_json::from_value(arguments["changed_files"].clone()).unwrap_or_default();
 
                 let k_note = if let Some(kn) = arguments.get("knowledge_note") {
                     let title = kn["title"].as_str().unwrap_or("避坑指南").to_string();
@@ -440,9 +435,10 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                     "knowledge" => &project.workspace_paths.knowledge,
                     _ => &project.workspace_paths.docs,
                 };
-                let id = arguments["id"].as_str().map(|s| s.to_string()).unwrap_or_else(|| {
-                    format!("{}_{}", asset_type, uuid::Uuid::new_v4().simple())
-                });
+                let id = arguments["id"]
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| format!("{}_{}", asset_type, uuid::Uuid::new_v4().simple()));
                 let file_path = root.join(subfolder).join(format!("{}.md", id));
                 // Sandboxed path validation to prevent symlink/path traversal escapes
                 devos_core::ensure_within_root(&root, &file_path)?;
@@ -451,19 +447,23 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
             }
 
             "claim_issue" => {
-                let issue_id = arguments["issue_id"].as_str().ok_or_else(|| DevosError::Custom {
-                    code: "MISSING_ISSUE_ID".to_string(),
-                    message: "issue_id is required".to_string(),
-                    hint: None,
-                    plain_message: None,
-                })?;
+                let issue_id =
+                    arguments["issue_id"]
+                        .as_str()
+                        .ok_or_else(|| DevosError::Custom {
+                            code: "MISSING_ISSUE_ID".to_string(),
+                            message: "issue_id is required".to_string(),
+                            hint: None,
+                            plain_message: None,
+                        })?;
                 let agent_name = arguments["agent_name"].as_str().unwrap_or("External Agent");
                 let session_id = arguments["session_id"]
                     .as_str()
                     .map(|s| s.to_string())
                     .or_else(|| std::env::var("DEVOS_SESSION_ID").ok())
                     .unwrap_or_else(|| "default_session".to_string());
-                let issue = IssueManager::claim_issue(&root, &project, issue_id, agent_name, &session_id)?;
+                let issue =
+                    IssueManager::claim_issue(&root, &project, issue_id, agent_name, &session_id)?;
                 Ok(serde_json::to_value(issue)?)
             }
 
@@ -475,8 +475,14 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                         Ok(json!({ "checkpoints": list }))
                     }
                     "create" => {
-                        let note = arguments["note"].as_str().unwrap_or("Agent checkpoint before modification");
-                        let cp = devos_core::CheckpointManager::create_checkpoint(&root, note, "agent_auto")?;
+                        let note = arguments["note"]
+                            .as_str()
+                            .unwrap_or("Agent checkpoint before modification");
+                        let cp = devos_core::CheckpointManager::create_checkpoint(
+                            &root,
+                            note,
+                            "agent_auto",
+                        )?;
                         Ok(serde_json::to_value(cp)?)
                     }
                     _ => Err(DevosError::Custom {

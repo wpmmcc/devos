@@ -1,7 +1,7 @@
-use std::path::Path;
-use devos_schema::{BoardCard, BoardColumn, ChecklistStep, DevosProject};
 use crate::error::{DevosError, Result};
 use crate::fs_utils::{atomic_write_json, read_json};
+use devos_schema::{BoardCard, BoardColumn, ChecklistStep, DevosProject};
+use std::path::Path;
 
 pub struct BoardManager;
 

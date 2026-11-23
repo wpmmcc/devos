@@ -59,7 +59,13 @@ pub struct CommandEnvelope<T> {
 }
 
 impl<T: Serialize> CommandEnvelope<T> {
-    pub fn success(command_id: &str, project_id: &str, data: T, duration_ms: u64, locale: &str) -> Self {
+    pub fn success(
+        command_id: &str,
+        project_id: &str,
+        data: T,
+        duration_ms: u64,
+        locale: &str,
+    ) -> Self {
         Self {
             protocol_version: "1.0".to_string(),
             ok: true,

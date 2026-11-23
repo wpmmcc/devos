@@ -32,14 +32,18 @@ mod tests {
         let driver = DdevDriver::new();
         assert_eq!(driver.driver_name(), "ddev");
 
-        let prereqs = driver.check_prereqs().expect("check_prereqs should not fail");
+        let prereqs = driver
+            .check_prereqs()
+            .expect("check_prereqs should not fail");
         assert_eq!(prereqs.len(), 3);
         assert!(prereqs.iter().any(|p| p.key == "docker"));
         assert!(prereqs.iter().any(|p| p.key == "ddev"));
         assert!(prereqs.iter().any(|p| p.key == "proxy"));
 
         let dummy_root = PathBuf::from("/tmp/nonexistent-devos-ddev-test");
-        let status = driver.status(&dummy_root).expect("status should return EnvStatus");
+        let status = driver
+            .status(&dummy_root)
+            .expect("status should return EnvStatus");
         assert_eq!(status.driver, "ddev");
         assert!(!status.running);
     }
@@ -49,14 +53,18 @@ mod tests {
         let driver = DevcontainerDriver::new();
         assert_eq!(driver.driver_name(), "devcontainer");
 
-        let prereqs = driver.check_prereqs().expect("check_prereqs should not fail");
+        let prereqs = driver
+            .check_prereqs()
+            .expect("check_prereqs should not fail");
         assert_eq!(prereqs.len(), 3);
         assert!(prereqs.iter().any(|p| p.key == "docker"));
         assert!(prereqs.iter().any(|p| p.key == "devcontainer"));
         assert!(prereqs.iter().any(|p| p.key == "proxy"));
 
         let dummy_root = PathBuf::from("/tmp/nonexistent-devos-dc-test");
-        let status = driver.status(&dummy_root).expect("status should return EnvStatus");
+        let status = driver
+            .status(&dummy_root)
+            .expect("status should return EnvStatus");
         assert_eq!(status.driver, "devcontainer");
         assert!(!status.running);
     }

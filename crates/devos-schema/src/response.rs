@@ -31,7 +31,12 @@ impl<T> ApiResponse<T> {
         }
     }
 
-    pub fn error(code: impl Into<String>, message: impl Into<String>, hint: Option<String>, plain_message: Option<String>) -> Self {
+    pub fn error(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        hint: Option<String>,
+        plain_message: Option<String>,
+    ) -> Self {
         Self {
             ok: false,
             data: None,

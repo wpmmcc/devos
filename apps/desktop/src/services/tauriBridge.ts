@@ -170,6 +170,34 @@ export const Bridge = {
 
   exportDiagnosticBundle: (projectPath?: string) =>
     invokeTauri<string>('export_diagnostic_bundle', { projectPath }),
+
+  exportReleaseBundle: (projectPath: string, version: string, panelFriendly: boolean) =>
+    invokeTauri<any>('export_release_bundle', { projectPath, version, panelFriendly }),
+
+  listCheckpoints: (projectPath: string) =>
+    invokeTauri<any[]>('list_vcs_checkpoints', { projectPath }),
+
+  createCheckpoint: (projectPath: string, note: string, source = 'user_manual') =>
+    invokeTauri<any>('create_vcs_checkpoint', { projectPath, note, source }),
+
+  restoreCheckpoint: (projectPath: string, checkpointId: string) =>
+    invokeTauri<boolean>('restore_vcs_checkpoint', { projectPath, checkpointId }),
+
+  getStorageReport: (projectPath: string) =>
+    invokeTauri<{
+      artifacts_bytes: number;
+      logs_bytes: number;
+      checkpoints_bytes: number;
+      total_project_bytes: number;
+      host_available_gb: number;
+      low_disk_warning: boolean;
+    }>('get_storage_report', { projectPath }),
+
+  cleanStorage: (projectPath: string, olderThanDays: number, pruneDocker: boolean) =>
+    invokeTauri<number>('clean_storage', { projectPath, olderThanDays, pruneDocker }),
+
+  trashProject: (projectPath: string) =>
+    invokeTauri<string>('trash_project', { projectPath }),
 };
 
 // Mock Fallbacks for Browser
@@ -370,6 +398,71 @@ function mockHandler<T>(cmd: string, args: Record<string, any>): ApiResponse<T> 
         ],
       } as any,
     };
+  }
+
+  if (cmd === 'export_release_bundle') {
+    return {
+      ok: true,
+      data: {
+        version: args.version || 'v1.0.0',
+        release_dir: `releases/${args.version || 'v1.0.0'}`,
+        zip_archive_path: `releases/demo-${args.version || 'v1.0.0'}.zip`,
+        preflight_gates: [
+          { gate_name: 'Git 工作区洁净检查', passed: true, message: 'Git 工作区状态整洁，无未提交的脏改动', details: [] },
+          { gate_name: '源码凭据与高危 Token 扫描', passed: true, message: '未检出硬编码密钥或明文 Token 泄漏', details: [] },
+          { gate_name: '生产环境变量模板说明覆盖度', passed: true, message: '生产环境变量均已在模板与说明清单中完整声明', details: [] },
+          { gate_name: '生产编排规范与健康探针门禁', passed: true, message: '生产配置具备重启策略与自动存活探测', details: [] },
+        ],
+      } as any,
+    };
+  }
+
+  if (cmd === 'list_vcs_checkpoints') {
+    return {
+      ok: true,
+      data: [
+        { id: 'cp_initial_scaffold', created_at: new Date(Date.now() - 3600000).toISOString(), note: '项目初始化脚手架快照', source: 'user_manual' },
+        { id: 'cp_before_refactor', created_at: new Date().toISOString(), note: 'Agent 处理任务前自动时光机快照', source: 'agent_auto' },
+      ] as any,
+    };
+  }
+
+  if (cmd === 'create_vcs_checkpoint') {
+    return {
+      ok: true,
+      data: {
+        id: `cp_${Date.now().toString(36)}`,
+        created_at: new Date().toISOString(),
+        note: args.note || '手动创建的时光机快照',
+        source: args.source || 'user_manual',
+      } as any,
+    };
+  }
+
+  if (cmd === 'restore_vcs_checkpoint') {
+    return { ok: true, data: true as any };
+  }
+
+  if (cmd === 'get_storage_report') {
+    return {
+      ok: true,
+      data: {
+        artifacts_bytes: 128 * 1024 * 1024,
+        logs_bytes: 46 * 1024 * 1024,
+        checkpoints_bytes: 168 * 1024 * 1024,
+        total_project_bytes: 342 * 1024 * 1024,
+        host_available_gb: 184.2,
+        low_disk_warning: false,
+      } as any,
+    };
+  }
+
+  if (cmd === 'clean_storage') {
+    return { ok: true, data: 174 * 1024 * 1024 as any };
+  }
+
+  if (cmd === 'trash_project') {
+    return { ok: true, data: '~/.devos/trash/demo' as any };
   }
 
   return { ok: true, data: null as any };

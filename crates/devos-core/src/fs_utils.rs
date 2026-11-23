@@ -1,10 +1,10 @@
+use crate::error::{DevosError, Result};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
-use crate::error::{DevosError, Result};
 
 fn echo_cache() -> &'static Mutex<HashMap<PathBuf, Instant>> {
     static CACHE: OnceLock<Mutex<HashMap<PathBuf, Instant>>> = OnceLock::new();
@@ -55,7 +55,11 @@ pub fn atomic_write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, content: C) -> Resu
 
     let parent_dir = path.parent().unwrap_or_else(|| Path::new("."));
     let file_name = path.file_name().and_then(|f| f.to_str()).unwrap_or("file");
-    let tmp_path = parent_dir.join(format!(".{}.tmp.{}", file_name, uuid::Uuid::new_v4().simple()));
+    let tmp_path = parent_dir.join(format!(
+        ".{}.tmp.{}",
+        file_name,
+        uuid::Uuid::new_v4().simple()
+    ));
 
     let mut tmp_file = fs::File::create(&tmp_path)?;
     tmp_file.write_all(&sanitized_bytes)?;
@@ -255,7 +259,8 @@ pub fn ensure_within_root(root: &Path, target: &Path) -> Result<PathBuf> {
             code: "GUARDRAIL_PATH_OUT_OF_SANDBOX".to_string(),
             reason: format!("Path {:?} is outside of project root {:?}", target, root),
             hint: "Please ensure the path is relative to the project workspace root.".to_string(),
-            plain_message: "该文件路径超出了项目目录安全范围（禁止路径穿越或符号链接逃逸）。".to_string(),
+            plain_message: "该文件路径超出了项目目录安全范围（禁止路径穿越或符号链接逃逸）。"
+                .to_string(),
         });
     }
 
@@ -281,7 +286,8 @@ mod tests {
         }"#;
 
         let cleaned = clean_jsonc(raw);
-        let parsed: serde_json::Value = serde_json::from_str(&cleaned).expect("Failed to parse cleaned jsonc");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&cleaned).expect("Failed to parse cleaned jsonc");
         assert_eq!(parsed["name"], "devos");
         assert_eq!(parsed["items"][0], "a");
         assert_eq!(parsed["nested"]["flag"], true);

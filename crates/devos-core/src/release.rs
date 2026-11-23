@@ -1,13 +1,13 @@
+use crate::error::Result;
+use crate::fs_utils::{atomic_write, atomic_write_json};
+use devos_schema::{DevosProject, ProjectType};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use walkdir::WalkDir;
-use devos_schema::{DevosProject, ProjectType};
-use crate::error::Result;
-use crate::fs_utils::{atomic_write, atomic_write_json};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ReleaseManifest {
@@ -64,7 +64,10 @@ impl ReleaseManager {
     /// 2. Secrets & high-entropy token leak scan
     /// 3. Environment variable template coverage check
     /// 4. Production compose syntax and healthcheck validation
-    pub fn run_release_preflight(root: &Path, _project: &DevosProject) -> Result<Vec<PreflightGateResult>> {
+    pub fn run_release_preflight(
+        root: &Path,
+        _project: &DevosProject,
+    ) -> Result<Vec<PreflightGateResult>> {
         let mut results = Vec::new();
 
         // Gate 1: Git clean check
@@ -105,14 +108,21 @@ impl ReleaseManager {
         for entry in WalkDir::new(root).max_depth(3).into_iter().flatten() {
             let path = entry.path();
             let path_str = path.to_string_lossy();
-            if path_str.contains(".git") || path_str.contains(".devos") || path_str.contains("node_modules") {
+            if path_str.contains(".git")
+                || path_str.contains(".devos")
+                || path_str.contains("node_modules")
+            {
                 continue;
             }
             if path.is_file() {
                 if let Ok(content) = fs::read_to_string(path) {
                     for (pat, desc) in sensitive_patterns {
                         if content.contains(pat) {
-                            leak_details.push(format!("{}: {}", path.strip_prefix(root).unwrap_or(path).display(), desc));
+                            leak_details.push(format!(
+                                "{}: {}",
+                                path.strip_prefix(root).unwrap_or(path).display(),
+                                desc
+                            ));
                         }
                     }
                 }
@@ -285,7 +295,8 @@ SECRET_KEY=replace_with_a_secure_random_production_key_32bytes
 
         // 3. Generate deploy/Dockerfile
         let dockerfile_content = match project.project_type {
-            ProjectType::Web => r#"# Multi-stage production build
+            ProjectType::Web => {
+                r#"# Multi-stage production build
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY app/package*.json ./
@@ -297,8 +308,10 @@ FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
-"#,
-            _ => r#"# Lightweight Python production runner
+"#
+            }
+            _ => {
+                r#"# Lightweight Python production runner
 FROM python:3.11-slim
 WORKDIR /app
 RUN groupadd -r devos && useradd -r -g devos devos
@@ -307,7 +320,8 @@ RUN pip install --no-cache-dir -r requirements.txt || true
 COPY app/ ./
 USER devos
 CMD ["python", "main.py"]
-"#,
+"#
+            }
         };
         atomic_write(deploy_dir.join("Dockerfile"), dockerfile_content)?;
 
@@ -352,7 +366,11 @@ node_modules
         for entry in WalkDir::new(root).max_depth(2).into_iter().flatten() {
             let p = entry.path();
             let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            if name.starts_with('.') || name == "releases" || name == "target" || name == "node_modules" {
+            if name.starts_with('.')
+                || name == "releases"
+                || name == "target"
+                || name == "node_modules"
+            {
                 continue;
             }
             if p.is_file() {
@@ -416,7 +434,9 @@ node_modules
         atomic_write_json(release_dir.join("release-manifest.json"), &manifest)?;
 
         // 9. Export to .zip archive
-        let zip_path = root.join("releases").join(format!("{}-{}.zip", project.slug, clean_version));
+        let zip_path = root
+            .join("releases")
+            .join(format!("{}-{}.zip", project.slug, clean_version));
         let zip_res = Command::new("zip")
             .args(["-r", "-q", &zip_path.to_string_lossy(), "."])
             .current_dir(&release_dir)

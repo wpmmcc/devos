@@ -1,9 +1,3 @@
-use std::path::Path;
-use serde_json::{json, Value};
-use devos_schema::{
-    BoardColumn, CallerType, ChecklistStep, CommandEnvelope, DevosProject,
-    PermissionLevel, ProjectMode,
-};
 use crate::board::BoardManager;
 use crate::checkpoint::CheckpointManager;
 use crate::deploy_plugin::DeployPluginManager;
@@ -11,6 +5,12 @@ use crate::error::{DevosError, Result};
 use crate::guardrail::Guardrails;
 use crate::issue::IssueManager;
 use crate::release::ReleaseManager;
+use devos_schema::{
+    BoardColumn, CallerType, ChecklistStep, CommandEnvelope, DevosProject, PermissionLevel,
+    ProjectMode,
+};
+use serde_json::{json, Value};
+use std::path::Path;
 
 pub struct CommandBus;
 
@@ -40,15 +40,10 @@ impl CommandBus {
             | "vcs.checkpoint.create" => PermissionLevel::L1LocalSafeWrite,
 
             // L2 Controlled state change
-            "project.create"
-            | "env.up"
-            | "env.down"
-            | "env.exec"
-            | "env.snapshot"
-            | "env.restore"
-            | "test.run_target"
-            | "vcs.commit"
-            | "release.prepare" => PermissionLevel::L2ControlledStateChange,
+            "project.create" | "env.up" | "env.down" | "env.exec" | "env.snapshot"
+            | "env.restore" | "test.run_target" | "vcs.commit" | "release.prepare" => {
+                PermissionLevel::L2ControlledStateChange
+            }
 
             // L3 Human exclusive danger (Strictly blocked for Agent MCP)
             "project.mode.set"
@@ -92,7 +87,10 @@ impl CommandBus {
                     &project.project_id,
                     "AUTH_HUMAN_APPROVAL_REQUIRED",
                     "L3 high-risk command is strictly forbidden for external Agent sessions.",
-                    Some("This action requires explicit user confirmation in DevOS Desktop UI.".to_string()),
+                    Some(
+                        "This action requires explicit user confirmation in DevOS Desktop UI."
+                            .to_string(),
+                    ),
                     None,
                     None,
                     start.elapsed().as_millis() as u64,
@@ -110,7 +108,10 @@ impl CommandBus {
                         &project.project_id,
                         "GUARDRAIL_MODE_BLOCKED",
                         "Destructive environment operations are blocked in DEPLOY_PROD mode.",
-                        Some("Switch project mode to DEV_LOCAL to allow destructive resets.".to_string()),
+                        Some(
+                            "Switch project mode to DEV_LOCAL to allow destructive resets."
+                                .to_string(),
+                        ),
                         None,
                         None,
                         start.elapsed().as_millis() as u64,
@@ -171,27 +172,44 @@ impl CommandBus {
                     CallerType::AgentMcp => "agent",
                     _ => "user",
                 };
-                let card = BoardManager::upsert_card(root, project, card_id, title, col, updated_by, None, None)?;
+                let card = BoardManager::upsert_card(
+                    root, project, card_id, title, col, updated_by, None, None,
+                )?;
                 Ok(serde_json::to_value(card)?)
             }
             "board.complete" => {
                 let card_id = payload["card_id"].as_str().unwrap_or("");
-                let card = BoardManager::upsert_card(root, project, Some(card_id.to_string()), None, BoardColumn::Done, "user", None, None)?;
+                let card = BoardManager::upsert_card(
+                    root,
+                    project,
+                    Some(card_id.to_string()),
+                    None,
+                    BoardColumn::Done,
+                    "user",
+                    None,
+                    None,
+                )?;
                 Ok(serde_json::to_value(card)?)
             }
 
             // Domain 4: Testing & Issues
             "test.submit" => {
-                let card_id = payload["card_id"].as_str().ok_or_else(|| DevosError::Custom {
-                    code: "MISSING_CARD_ID".to_string(),
-                    message: "card_id is required".to_string(),
-                    hint: None,
-                    plain_message: None,
-                })?;
+                let card_id = payload["card_id"]
+                    .as_str()
+                    .ok_or_else(|| DevosError::Custom {
+                        code: "MISSING_CARD_ID".to_string(),
+                        message: "card_id is required".to_string(),
+                        hint: None,
+                        plain_message: None,
+                    })?;
                 let summary = payload["summary_plain"].as_str().unwrap_or("功能提测");
-                let steps: Vec<ChecklistStep> = serde_json::from_value(payload["test_checklist"].clone()).unwrap_or_default();
-                let targets: Vec<String> = serde_json::from_value(payload["run_target_ids"].clone()).unwrap_or_default();
-                let card = BoardManager::submit_for_testing(root, project, card_id, summary, steps, targets)?;
+                let steps: Vec<ChecklistStep> =
+                    serde_json::from_value(payload["test_checklist"].clone()).unwrap_or_default();
+                let targets: Vec<String> =
+                    serde_json::from_value(payload["run_target_ids"].clone()).unwrap_or_default();
+                let card = BoardManager::submit_for_testing(
+                    root, project, card_id, summary, steps, targets,
+                )?;
                 Ok(serde_json::to_value(card)?)
             }
             "issue.list" => {
@@ -209,7 +227,8 @@ impl CommandBus {
             "issue.resolve" => {
                 let issue_id = payload["issue_id"].as_str().unwrap_or("");
                 let fix = payload["fix_summary_plain"].as_str().unwrap_or("");
-                let files: Vec<String> = serde_json::from_value(payload["changed_files"].clone()).unwrap_or_default();
+                let files: Vec<String> =
+                    serde_json::from_value(payload["changed_files"].clone()).unwrap_or_default();
                 let issue = IssueManager::resolve_issue(root, project, issue_id, fix, files, None)?;
                 Ok(serde_json::to_value(issue)?)
             }
@@ -234,7 +253,10 @@ impl CommandBus {
             }
             "deploy.plugin.validate" => {
                 let mut cfg = std::collections::HashMap::new();
-                cfg.insert("host".to_string(), payload["host"].as_str().unwrap_or("127.0.0.1").to_string());
+                cfg.insert(
+                    "host".to_string(),
+                    payload["host"].as_str().unwrap_or("127.0.0.1").to_string(),
+                );
                 let val = DeployPluginManager::validate_target("vps-docker", &cfg)?;
                 Ok(serde_json::to_value(val)?)
             }
@@ -249,14 +271,18 @@ impl CommandBus {
             _ => Err(DevosError::Custom {
                 code: "UNKNOWN_COMMAND".to_string(),
                 message: format!("Command '{}' is not registered on CommandBus", command_id),
-                hint: Some("Consult docs/14-unified-command-protocol-and-control-plane.md".to_string()),
+                hint: Some(
+                    "Consult docs/14-unified-command-protocol-and-control-plane.md".to_string(),
+                ),
                 plain_message: None,
             }),
         })();
 
         let elapsed = start.elapsed().as_millis() as u64;
         match res {
-            Ok(val) => CommandEnvelope::success(command_id, &project.project_id, val, elapsed, locale),
+            Ok(val) => {
+                CommandEnvelope::success(command_id, &project.project_id, val, elapsed, locale)
+            }
             Err(e) => CommandEnvelope::error(
                 command_id,
                 &project.project_id,
@@ -275,9 +301,9 @@ impl CommandBus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use crate::ProjectManager;
     use devos_schema::ProjectType;
+    use tempfile::tempdir;
 
     #[test]
     fn test_permission_matrix_and_agent_boundary() {
@@ -290,7 +316,8 @@ mod tests {
             "Test description",
             ProjectType::Hybrid,
             Some(&db),
-        ).unwrap();
+        )
+        .unwrap();
 
         // L0 Query: allowed for AgentMcp
         let l0_resp = CommandBus::dispatch(
@@ -325,7 +352,10 @@ mod tests {
             "zh-CN",
         );
         assert!(!l3_blocked.ok);
-        assert_eq!(l3_blocked.error.as_ref().unwrap().code, "AUTH_HUMAN_APPROVAL_REQUIRED");
+        assert_eq!(
+            l3_blocked.error.as_ref().unwrap().code,
+            "AUTH_HUMAN_APPROVAL_REQUIRED"
+        );
 
         // L3 High-Risk Danger: ALLOWED for HumanUI
         let l3_allowed = CommandBus::dispatch(

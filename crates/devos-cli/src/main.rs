@@ -1,18 +1,25 @@
 use clap::{Parser, Subcommand};
-use devos_core::{
-    BoardManager, Database, DevosError, IssueManager, ProjectManager, Result,
-};
+use devos_core::{BoardManager, Database, DevosError, IssueManager, ProjectManager, Result};
 use devos_env::{DdevDriver, DevcontainerDriver, EnvDriver, PreflightDoctor};
 use devos_schema::{ApiResponse, BoardColumn, DevosProject, ProjectType};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "devos", author, version, about = "DevOS CLI: AI Agent Workbench & Standardized Local Environment Controller")]
+#[command(
+    name = "devos",
+    author,
+    version,
+    about = "DevOS CLI: AI Agent Workbench & Standardized Local Environment Controller"
+)]
 struct Cli {
     #[arg(long, global = true, help = "Output response formatted as JSON")]
     json: bool,
 
-    #[arg(long, global = true, help = "Target project directory (defaults to current dir)")]
+    #[arg(
+        long,
+        global = true,
+        help = "Target project directory (defaults to current dir)"
+    )]
     project_dir: Option<PathBuf>,
 
     #[arg(long, help = "Run automated headless smoke test and verification")]
@@ -104,7 +111,10 @@ enum Commands {
 
     /// Preflight environment doctor check
     Doctor {
-        #[arg(long, help = "Automatically fix and self-heal missing environment dependencies")]
+        #[arg(
+            long,
+            help = "Automatically fix and self-heal missing environment dependencies"
+        )]
         fix: bool,
     },
 
@@ -121,6 +131,40 @@ enum Commands {
 
     /// Export a sanitized diagnostic bundle
     Diagnostic,
+
+    /// Export standardized universal production bundle (preflight gates, Docker Compose, DEPLOY.md, zip)
+    Bundle {
+        #[arg(long, default_value = "v1.0.0")]
+        version: String,
+        #[arg(long)]
+        panel_friendly: bool,
+    },
+
+    /// Manage lightweight VCS time machine checkpoints (refs/devos/checkpoints, zero Git pollution)
+    Checkpoint {
+        action: String, // list, create, restore
+        #[arg(long)]
+        note: Option<String>,
+        #[arg(long)]
+        id: Option<String>,
+    },
+
+    /// Clean expired artifacts, logs, and prune com.devos.managed docker images
+    Clean {
+        #[arg(long, default_value = "30")]
+        days: u64,
+        #[arg(long)]
+        prune_docker: bool,
+        #[arg(long)]
+        status: bool,
+    },
+
+    /// Workspace and project utilities (safe trash, validate)
+    Project {
+        action: String, // trash, validate
+        #[arg(long)]
+        path: Option<PathBuf>,
+    },
 }
 
 fn print_result<T: serde::Serialize>(json_mode: bool, res: Result<T>) {
@@ -343,7 +387,9 @@ async fn main() {
                     _ => Err(DevosError::Custom {
                         code: "UNKNOWN_ACTION".to_string(),
                         message: format!("Unknown env action: {}", action),
-                        hint: Some("Supported: status, up, down, exec, snapshot, restore".to_string()),
+                        hint: Some(
+                            "Supported: status, up, down, exec, snapshot, restore".to_string(),
+                        ),
                         plain_message: Some(format!("不支持的环境操作: {}", action)),
                     }),
                 }
@@ -422,7 +468,8 @@ async fn main() {
                             hint: None,
                             plain_message: Some("提测时请指定卡片编号 --card-id".to_string()),
                         })?;
-                        let sum = summary.unwrap_or_else(|| "功能开发完成，请按验收单测试".to_string());
+                        let sum =
+                            summary.unwrap_or_else(|| "功能开发完成，请按验收单测试".to_string());
                         let steps = if let Some(j) = checklist_json {
                             serde_json::from_str(&j).unwrap_or_default()
                         } else {
@@ -511,14 +558,8 @@ async fn main() {
                         let changed = files
                             .map(|f| f.split(',').map(|s| s.trim().to_string()).collect())
                             .unwrap_or_default();
-                        let issue = IssueManager::resolve_issue(
-                            &root,
-                            &project,
-                            &id,
-                            &sum,
-                            changed,
-                            None,
-                        )?;
+                        let issue =
+                            IssueManager::resolve_issue(&root, &project, &id, &sum, changed, None)?;
                         Ok(serde_json::to_value(issue)?)
                     }
                     "retest" => {
@@ -536,7 +577,8 @@ async fn main() {
                                 "复测不通过，问题依然存在".to_string()
                             }
                         });
-                        let issue = IssueManager::retest_issue(&root, &project, &id, is_passed, &fb)?;
+                        let issue =
+                            IssueManager::retest_issue(&root, &project, &id, is_passed, &fb)?;
                         Ok(serde_json::to_value(issue)?)
                     }
                     _ => Err(DevosError::Custom {
@@ -587,8 +629,121 @@ async fn main() {
         Commands::Diagnostic => {
             let loaded = ProjectManager::find_and_load(".").ok().map(|(r, _)| r);
             let project_root = cli.project_dir.as_deref().or(loaded.as_deref());
-            let res = devos_core::export_diagnostic_bundle(project_root)
-                .map(|p| serde_json::json!({ "status": "ok", "bundle_path": p.display().to_string() }));
+            let res = devos_core::export_diagnostic_bundle(project_root).map(
+                |p| serde_json::json!({ "status": "ok", "bundle_path": p.display().to_string() }),
+            );
+            print_result(json_mode, res);
+        }
+
+        Commands::Bundle {
+            version,
+            panel_friendly,
+        } => {
+            let res = (|| -> Result<devos_core::ReleaseBuildResult> {
+                let (root, project) = get_project_context(cli.project_dir.clone())?;
+                devos_core::ReleaseManager::prepare_release_artifacts(
+                    &root,
+                    &project,
+                    &version,
+                    panel_friendly,
+                )
+            })();
+            print_result(json_mode, res);
+        }
+
+        Commands::Checkpoint { action, note, id } => {
+            let res = (|| -> Result<serde_json::Value> {
+                let (root, _) = get_project_context(cli.project_dir.clone())?;
+                match action.as_str() {
+                    "list" => {
+                        let list = devos_core::CheckpointManager::list_checkpoints(&root)?;
+                        Ok(serde_json::to_value(list)?)
+                    }
+                    "create" => {
+                        let note_str = note.unwrap_or_else(|| "CLI manual checkpoint".to_string());
+                        let cp = devos_core::CheckpointManager::create_checkpoint(
+                            &root,
+                            &note_str,
+                            "user_manual",
+                        )?;
+                        Ok(serde_json::to_value(cp)?)
+                    }
+                    "restore" => {
+                        let cp_id = id.ok_or_else(|| DevosError::Custom {
+                            code: "MISSING_CHECKPOINT_ID".to_string(),
+                            message: "Checkpoint ID required for restore".to_string(),
+                            hint: Some("Use --id <checkpoint_id>".to_string()),
+                            plain_message: Some("还原时必须指定快照编号 --id".to_string()),
+                        })?;
+                        devos_core::CheckpointManager::restore_checkpoint(&root, &cp_id)?;
+                        Ok(serde_json::json!({ "status": "restored", "checkpoint_id": cp_id }))
+                    }
+                    _ => Err(DevosError::Custom {
+                        code: "UNKNOWN_ACTION".to_string(),
+                        message: format!("Unknown checkpoint action: {}", action),
+                        hint: Some("Supported: list, create, restore".to_string()),
+                        plain_message: Some(format!("未知的时光机操作: {}", action)),
+                    }),
+                }
+            })();
+            print_result(json_mode, res);
+        }
+
+        Commands::Clean {
+            days,
+            prune_docker,
+            status,
+        } => {
+            let res = (|| -> Result<serde_json::Value> {
+                let (root, _) = get_project_context(cli.project_dir.clone())?;
+                if status {
+                    let report = devos_core::StorageCleaner::calculate_storage_usage(&root);
+                    Ok(serde_json::to_value(report)?)
+                } else {
+                    let freed = devos_core::StorageCleaner::clean_expired_artifacts(&root, days)?;
+                    if prune_docker {
+                        let _ = devos_core::StorageCleaner::prune_managed_docker_cache();
+                    }
+                    Ok(serde_json::json!({
+                        "status": "cleaned",
+                        "freed_bytes": freed,
+                        "pruned_docker": prune_docker
+                    }))
+                }
+            })();
+            print_result(json_mode, res);
+        }
+
+        Commands::Project { action, path } => {
+            let res = (|| -> Result<serde_json::Value> {
+                let target = path
+                    .or(cli.project_dir.clone())
+                    .unwrap_or_else(|| PathBuf::from("."));
+                match action.as_str() {
+                    "trash" => {
+                        let db = Database::open_global().ok();
+                        let dest = devos_core::ProjectManager::trash_project(&target, db.as_ref())?;
+                        Ok(serde_json::json!({
+                            "status": "trashed",
+                            "trash_path": dest.display().to_string()
+                        }))
+                    }
+                    "validate" => {
+                        let warnings =
+                            devos_core::ProjectManager::validate_project_workspace_path(&target);
+                        Ok(serde_json::json!({
+                            "valid": warnings.is_empty(),
+                            "warnings": warnings
+                        }))
+                    }
+                    _ => Err(DevosError::Custom {
+                        code: "UNKNOWN_ACTION".to_string(),
+                        message: format!("Unknown project action: {}", action),
+                        hint: Some("Supported: trash, validate".to_string()),
+                        plain_message: Some(format!("未知的项目操作: {}", action)),
+                    }),
+                }
+            })();
             print_result(json_mode, res);
         }
     }

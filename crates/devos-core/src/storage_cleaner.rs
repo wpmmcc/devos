@@ -1,9 +1,9 @@
+use crate::error::Result;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
-use crate::error::Result;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StorageReport {
@@ -123,7 +123,13 @@ impl StorageCleaner {
     /// Prune dangling containers and images tagged strictly with com.devos.managed=true
     pub fn prune_managed_docker_cache() -> Result<()> {
         let _ = Command::new("docker")
-            .args(["image", "prune", "-f", "--filter", "label=com.devos.managed=true"])
+            .args([
+                "image",
+                "prune",
+                "-f",
+                "--filter",
+                "label=com.devos.managed=true",
+            ])
             .output();
         Ok(())
     }

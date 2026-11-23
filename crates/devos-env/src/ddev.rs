@@ -1,9 +1,9 @@
+use crate::doctor::PreflightDoctor;
+use crate::driver::{DiagnosticItem, EnvDriver, EnvStatus, ExecResult};
+use devos_core::{inject_proxy_bypass_env, DevosError, PortRegistry, Result};
 use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
-use devos_core::{inject_proxy_bypass_env, DevosError, PortRegistry, Result};
-use crate::doctor::PreflightDoctor;
-use crate::driver::{DiagnosticItem, EnvDriver, EnvStatus, ExecResult};
 
 pub struct DdevDriver;
 
@@ -47,12 +47,14 @@ impl EnvDriver for DdevDriver {
         start_cmd.arg("start").current_dir(project_root);
         inject_proxy_bypass_env(&mut start_cmd);
 
-        let output = start_cmd.output().map_err(|e| DevosError::EnvironmentError {
-            code: "DDEV_START_FAILED".to_string(),
-            message: format!("Failed to execute ddev start: {}", e),
-            hint: "Ensure Docker is running and DDEV is installed.".to_string(),
-            plain_message: "启动 Web 环境失败，请检查 Docker 是否正常运行。".to_string(),
-        })?;
+        let output = start_cmd
+            .output()
+            .map_err(|e| DevosError::EnvironmentError {
+                code: "DDEV_START_FAILED".to_string(),
+                message: format!("Failed to execute ddev start: {}", e),
+                hint: "Ensure Docker is running and DDEV is installed.".to_string(),
+                plain_message: "启动 Web 环境失败，请检查 Docker 是否正常运行。".to_string(),
+            })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -87,12 +89,18 @@ impl EnvDriver for DdevDriver {
                     let raw = json.get("raw").unwrap_or(&json);
                     let status_str = raw.get("status").and_then(|s| s.as_str()).unwrap_or("");
                     let running = status_str == "running" || status_str == "OK";
-                    let primary_url = raw.get("primary_url").and_then(|u| u.as_str()).map(|s| s.to_string());
+                    let primary_url = raw
+                        .get("primary_url")
+                        .and_then(|u| u.as_str())
+                        .map(|s| s.to_string());
                     return Ok(EnvStatus {
                         running,
                         driver: "ddev".to_string(),
                         primary_url,
-                        container_name: raw.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()),
+                        container_name: raw
+                            .get("name")
+                            .and_then(|n| n.as_str())
+                            .map(|s| s.to_string()),
                         details: Some(json),
                     });
                 }
@@ -118,10 +126,7 @@ impl EnvDriver for DdevDriver {
     ) -> Result<ExecResult> {
         let start = Instant::now();
         let mut exec_cmd = Command::new("ddev");
-        exec_cmd
-            .arg("exec")
-            .arg(cmd)
-            .current_dir(project_root);
+        exec_cmd.arg("exec").arg(cmd).current_dir(project_root);
         inject_proxy_bypass_env(&mut exec_cmd);
 
         let output = exec_cmd.output().map_err(DevosError::Io)?;

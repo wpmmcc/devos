@@ -1,6 +1,6 @@
+use crate::driver::{DiagnosticItem, DiagnosticStatus};
 use std::path::PathBuf;
 use std::process::Command;
-use crate::driver::{DiagnosticItem, DiagnosticStatus};
 
 pub struct PreflightDoctor;
 
@@ -26,14 +26,20 @@ impl PreflightDoctor {
 
     pub fn auto_fix_devcontainer() -> Result<String, String> {
         // 1. Try pnpm
-        if let Ok(out) = Command::new("pnpm").args(["add", "-g", "@devcontainers/cli"]).output() {
+        if let Ok(out) = Command::new("pnpm")
+            .args(["add", "-g", "@devcontainers/cli"])
+            .output()
+        {
             if out.status.success() {
                 return Ok("通过 pnpm 自动安装 @devcontainers/cli 成功".to_string());
             }
         }
 
         // 2. Try npm
-        if let Ok(out) = Command::new("npm").args(["install", "-g", "@devcontainers/cli"]).output() {
+        if let Ok(out) = Command::new("npm")
+            .args(["install", "-g", "@devcontainers/cli"])
+            .output()
+        {
             if out.status.success() {
                 return Ok("通过 npm 自动安装 @devcontainers/cli 成功".to_string());
             }
@@ -44,11 +50,19 @@ impl PreflightDoctor {
             let bin_dir = home.join(".devos").join("bin");
             let _ = std::fs::create_dir_all(&bin_dir);
             if let Ok(out) = Command::new("npm")
-                .args(["install", "--prefix", bin_dir.to_str().unwrap_or(""), "@devcontainers/cli"])
+                .args([
+                    "install",
+                    "--prefix",
+                    bin_dir.to_str().unwrap_or(""),
+                    "@devcontainers/cli",
+                ])
                 .output()
             {
                 if out.status.success() {
-                    return Ok("已将 @devcontainers/cli 安全安装至 DevOS 私有托管目录 (~/.devos/bin/)".to_string());
+                    return Ok(
+                        "已将 @devcontainers/cli 安全安装至 DevOS 私有托管目录 (~/.devos/bin/)"
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -208,7 +222,10 @@ impl PreflightDoctor {
         }
 
         // 2. Check if npx can run it
-        if let Ok(out) = Command::new("npx").args(["--no-install", "@devcontainers/cli", "--version"]).output() {
+        if let Ok(out) = Command::new("npx")
+            .args(["--no-install", "@devcontainers/cli", "--version"])
+            .output()
+        {
             if out.status.success() {
                 let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
                 return DiagnosticItem {
@@ -226,7 +243,10 @@ impl PreflightDoctor {
             title: "Dev Container 后端脚本引擎".to_string(),
             status: DiagnosticStatus::Warning,
             message: "未检测到 @devcontainers/cli 命令".to_string(),
-            fix_hint: Some("可点击「一键环境自愈」自动安装，或执行 `pnpm add -g @devcontainers/cli`。".to_string()),
+            fix_hint: Some(
+                "可点击「一键环境自愈」自动安装，或执行 `pnpm add -g @devcontainers/cli`。"
+                    .to_string(),
+            ),
         }
     }
 
@@ -245,7 +265,9 @@ impl PreflightDoctor {
                 title: "Windows WSL2 运行环境".to_string(),
                 status: DiagnosticStatus::Error,
                 message: "WSL2 未启用或配置不完整".to_string(),
-                fix_hint: Some("请在 PowerShell 管理员窗口执行 `wsl --install` 并重启电脑。".to_string()),
+                fix_hint: Some(
+                    "请在 PowerShell 管理员窗口执行 `wsl --install` 并重启电脑。".to_string(),
+                ),
             },
         }
     }

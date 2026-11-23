@@ -1,7 +1,7 @@
+use crate::error::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
-use crate::error::Result;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum PluginType {
@@ -170,14 +170,20 @@ impl DeployPluginManager {
         }
 
         // Test network connectivity / port reachability
-        let port = config.get("port").and_then(|p| p.parse::<u16>().ok()).unwrap_or(22);
+        let port = config
+            .get("port")
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(22);
         let timeout = std::time::Duration::from_secs(3);
         let target_addr = format!("{}:{}", host, port);
-        
+
         let connected = std::net::TcpStream::connect_timeout(
-            &target_addr.parse().unwrap_or_else(|_| std::net::SocketAddr::from(([127, 0, 0, 1], port))),
+            &target_addr
+                .parse()
+                .unwrap_or_else(|_| std::net::SocketAddr::from(([127, 0, 0, 1], port))),
             timeout,
-        ).is_ok();
+        )
+        .is_ok();
 
         if !connected {
             // Simulated validation pass for localhost/preview tests
@@ -194,7 +200,10 @@ impl DeployPluginManager {
                 connected: false,
                 remote_docker_version: None,
                 free_disk_gb: None,
-                message: format!("无法连接至目标主机 {}，请检查 IP、端口与安全组防火墙设置", target_addr),
+                message: format!(
+                    "无法连接至目标主机 {}，请检查 IP、端口与安全组防火墙设置",
+                    target_addr
+                ),
             });
         }
 
@@ -212,12 +221,22 @@ impl DeployPluginManager {
         release_bundle_path: &Path,
         config: &HashMap<String, String>,
     ) -> Result<DeployPlan> {
-        let host = config.get("host").cloned().unwrap_or_else(|| "127.0.0.1".to_string());
-        let deploy_dir = config.get("deploy_dir").cloned().unwrap_or_else(|| "/opt/apps".to_string());
+        let host = config
+            .get("host")
+            .cloned()
+            .unwrap_or_else(|| "127.0.0.1".to_string());
+        let deploy_dir = config
+            .get("deploy_dir")
+            .cloned()
+            .unwrap_or_else(|| "/opt/apps".to_string());
 
         let mut files = Vec::new();
         if release_bundle_path.exists() {
-            for entry in walkdir::WalkDir::new(release_bundle_path).max_depth(3).into_iter().flatten() {
+            for entry in walkdir::WalkDir::new(release_bundle_path)
+                .max_depth(3)
+                .into_iter()
+                .flatten()
+            {
                 if entry.file_type().is_file() {
                     if let Ok(rel) = entry.path().strip_prefix(release_bundle_path) {
                         files.push(rel.display().to_string());
@@ -249,7 +268,10 @@ impl DeployPluginManager {
     where
         F: FnMut(DeployProgressEvent),
     {
-        let host = config.get("host").cloned().unwrap_or_else(|| "127.0.0.1".to_string());
+        let host = config
+            .get("host")
+            .cloned()
+            .unwrap_or_else(|| "127.0.0.1".to_string());
 
         // Step 1: Preparing
         progress_cb(DeployProgressEvent {
@@ -297,13 +319,19 @@ impl DeployPluginManager {
         target_version: &str,
         config: &HashMap<String, String>,
     ) -> Result<DeployResult> {
-        let host = config.get("host").cloned().unwrap_or_else(|| "127.0.0.1".to_string());
+        let host = config
+            .get("host")
+            .cloned()
+            .unwrap_or_else(|| "127.0.0.1".to_string());
         Ok(DeployResult {
             ok: true,
             online_url: Some(format!("http://{}:8080", host)),
             deployed_version: target_version.to_string(),
             error_message: None,
-            sanitized_log: Some(format!("Rolled back to previous version {} on {}.", target_version, host)),
+            sanitized_log: Some(format!(
+                "Rolled back to previous version {} on {}.",
+                target_version, host
+            )),
         })
     }
 }

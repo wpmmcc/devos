@@ -1,11 +1,11 @@
+use crate::error::{DevosError, Result};
+use crate::fs_utils::{atomic_write, atomic_write_json, read_json, read_to_string};
+pub use devos_schema::AgentDetection;
+use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use serde_json::{json, Value};
 use toml_edit::{value, DocumentMut, Item};
-pub use devos_schema::AgentDetection;
-use crate::error::{DevosError, Result};
-use crate::fs_utils::{atomic_write, atomic_write_json, read_json, read_to_string};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ConfigFormat {
@@ -32,7 +32,11 @@ impl AgentConfigManager {
     pub fn resolve_mcp_bin_path() -> PathBuf {
         // 1. Check ~/.devos/bin/devos-mcp
         if let Some(home) = dirs::home_dir() {
-            let devos_bin = home.join(".devos").join("bin").join(if cfg!(windows) { "devos-mcp.exe" } else { "devos-mcp" });
+            let devos_bin = home.join(".devos").join("bin").join(if cfg!(windows) {
+                "devos-mcp.exe"
+            } else {
+                "devos-mcp"
+            });
             if devos_bin.exists() {
                 return devos_bin;
             }
@@ -41,7 +45,11 @@ impl AgentConfigManager {
         // 2. Check if running alongside devos-mcp in same dir
         if let Ok(current_exe) = std::env::current_exe() {
             if let Some(parent) = current_exe.parent() {
-                let sibling = parent.join(if cfg!(windows) { "devos-mcp.exe" } else { "devos-mcp" });
+                let sibling = parent.join(if cfg!(windows) {
+                    "devos-mcp.exe"
+                } else {
+                    "devos-mcp"
+                });
                 if sibling.exists() {
                     return sibling;
                 }
@@ -206,7 +214,9 @@ impl AgentConfigManager {
                 {
                     dirs::config_dir()
                         .map(|d| d.join("Claude").join("claude_desktop_config.json"))
-                        .unwrap_or_else(|| home.join("AppData/Roaming/Claude/claude_desktop_config.json"))
+                        .unwrap_or_else(|| {
+                            home.join("AppData/Roaming/Claude/claude_desktop_config.json")
+                        })
                 }
                 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
                 {
@@ -217,7 +227,10 @@ impl AgentConfigManager {
             "factory_droid" => home.join(".factory").join("mcp.json"),
             "opencode" => home.join(".config").join("opencode").join("opencode.json"),
             "cursor" => home.join(".cursor").join("mcp.json"),
-            "windsurf" => home.join(".codeium").join("windsurf").join("mcp_config.json"),
+            "windsurf" => home
+                .join(".codeium")
+                .join("windsurf")
+                .join("mcp_config.json"),
             "vscode" => {
                 if let Some(root) = project_root {
                     root.join(".vscode").join("mcp.json")
@@ -252,7 +265,8 @@ impl AgentConfigManager {
                     }
                     #[cfg(target_os = "windows")]
                     {
-                        home.join("AppData/Local/Programs/TRAE").exists() || home.join(".trae").exists()
+                        home.join("AppData/Local/Programs/TRAE").exists()
+                            || home.join(".trae").exists()
                     }
                     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
                     {
@@ -261,14 +275,20 @@ impl AgentConfigManager {
                 }
                 "qoder" => home.join(".qoder").exists() || cfg_path.exists(),
                 "kimi_code" => home.join(".kimi-code").exists() || cfg_path.exists(),
-                "claude_code" => home.join(".claude.json").exists() || home.join(".claude").exists(),
-                "claude_desktop" => cfg_path.parent().map(|p| p.exists()).unwrap_or(false) || cfg_path.exists(),
+                "claude_code" => {
+                    home.join(".claude.json").exists() || home.join(".claude").exists()
+                }
+                "claude_desktop" => {
+                    cfg_path.parent().map(|p| p.exists()).unwrap_or(false) || cfg_path.exists()
+                }
                 "codex" => home.join(".codex").exists() || cfg_path.exists(),
                 "factory_droid" => home.join(".factory").exists() || cfg_path.exists(),
                 "opencode" => home.join(".config/opencode").exists() || cfg_path.exists(),
                 "cursor" => home.join(".cursor").exists() || cfg_path.exists(),
                 "windsurf" => home.join(".codeium/windsurf").exists() || cfg_path.exists(),
-                "vscode" => project_root.map(|r| r.join(".vscode").exists()).unwrap_or(false),
+                "vscode" => project_root
+                    .map(|r| r.join(".vscode").exists())
+                    .unwrap_or(false),
                 "project_mcp" => project_root.is_some(),
                 _ => cfg_path.exists(),
             };
@@ -342,7 +362,10 @@ impl AgentConfigManager {
         let backup_dir = home.join(".devos").join("backups").join(agent_id);
         fs::create_dir_all(&backup_dir)?;
 
-        let filename = file_path.file_name().and_then(|f| f.to_str()).unwrap_or("config");
+        let filename = file_path
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or("config");
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let backup_file = backup_dir.join(format!("{}.{}.bak", filename, timestamp));
 
@@ -373,21 +396,24 @@ impl AgentConfigManager {
             String::new()
         };
 
-        let mut doc = content.parse::<DocumentMut>().unwrap_or_else(|_| DocumentMut::new());
+        let mut doc = content
+            .parse::<DocumentMut>()
+            .unwrap_or_else(|_| DocumentMut::new());
 
         // Ensure [mcp_servers] table exists
         if !doc.contains_key("mcp_servers") {
             doc["mcp_servers"] = Item::Table(toml_edit::Table::new());
         }
 
-        let mcp_servers = doc["mcp_servers"].as_table_like_mut().ok_or_else(|| {
-            DevosError::Custom {
-                code: "INVALID_TOML_STRUCTURE".to_string(),
-                message: "Expected mcp_servers to be a table in Codex config".to_string(),
-                hint: None,
-                plain_message: Some("Codex 配置文件结构异常，无法合并 MCP 节点".to_string()),
-            }
-        })?;
+        let mcp_servers =
+            doc["mcp_servers"]
+                .as_table_like_mut()
+                .ok_or_else(|| DevosError::Custom {
+                    code: "INVALID_TOML_STRUCTURE".to_string(),
+                    message: "Expected mcp_servers to be a table in Codex config".to_string(),
+                    hint: None,
+                    plain_message: Some("Codex 配置文件结构异常，无法合并 MCP 节点".to_string()),
+                })?;
 
         // Surgically insert [mcp_servers.devos]
         let mut devos_table = toml_edit::Table::new();
@@ -449,7 +475,9 @@ impl AgentConfigManager {
         let servers = if root_map.contains_key("servers") {
             root_map.get_mut("servers").unwrap()
         } else {
-            root_map.entry("servers".to_string()).or_insert_with(|| json!({}))
+            root_map
+                .entry("servers".to_string())
+                .or_insert_with(|| json!({}))
         };
 
         if let Some(obj) = servers.as_object_mut() {
@@ -641,7 +669,10 @@ impl AgentConfigManager {
             ConfigFormat::CodexToml => {
                 if let Ok(content) = read_to_string(&cfg_path) {
                     if let Ok(mut doc) = content.parse::<DocumentMut>() {
-                        if let Some(servers) = doc.get_mut("mcp_servers").and_then(|i| i.as_table_like_mut()) {
+                        if let Some(servers) = doc
+                            .get_mut("mcp_servers")
+                            .and_then(|i| i.as_table_like_mut())
+                        {
                             servers.remove("devos");
                         }
                         atomic_write(&cfg_path, doc.to_string())?;
@@ -669,7 +700,8 @@ impl AgentConfigManager {
             }
             ConfigFormat::StandardJson => {
                 if let Ok(mut val) = read_json::<_, Value>(&cfg_path) {
-                    if let Some(servers) = val.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
+                    if let Some(servers) = val.get_mut("mcpServers").and_then(|v| v.as_object_mut())
+                    {
                         servers.remove("devos");
                     }
                     atomic_write_json(&cfg_path, &val)?;
@@ -685,7 +717,10 @@ impl AgentConfigManager {
             }
         }
 
-        Ok(format!("已成功为 {} 卸载 DevOS MCP 服务，未修改其他配置", meta.name))
+        Ok(format!(
+            "已成功为 {} 卸载 DevOS MCP 服务，未修改其他配置",
+            meta.name
+        ))
     }
 
     /// Generate manual configuration snippet for closed or manual tools (e.g. TRAE)
@@ -760,21 +795,31 @@ mod tests {
         assert!(updated.contains("Original user comments"));
         assert!(updated.contains("[mcp_servers.devos]"));
         assert!(updated.contains("command = \"/usr/bin/devos-mcp\""));
-        assert!(AgentConfigManager::is_mcp_configured(&cfg, ConfigFormat::CodexToml));
+        assert!(AgentConfigManager::is_mcp_configured(
+            &cfg,
+            ConfigFormat::CodexToml
+        ));
     }
 
     #[test]
     fn test_surgical_standard_json_backup_and_uninstall() {
         let dir = tempdir().unwrap();
         let cfg = dir.path().join(".mcp.json");
-        atomic_write_json(&cfg, &json!({
-            "mcpServers": {
-                "other_tool": { "command": "other" }
-            }
-        })).unwrap();
+        atomic_write_json(
+            &cfg,
+            &json!({
+                "mcpServers": {
+                    "other_tool": { "command": "other" }
+                }
+            }),
+        )
+        .unwrap();
 
         AgentConfigManager::merge_standard_json(&cfg, "/usr/bin/devos-mcp", "qoder").unwrap();
-        assert!(AgentConfigManager::is_mcp_configured(&cfg, ConfigFormat::StandardJson));
+        assert!(AgentConfigManager::is_mcp_configured(
+            &cfg,
+            ConfigFormat::StandardJson
+        ));
 
         let content: Value = read_json(&cfg).unwrap();
         assert!(content["mcpServers"]["other_tool"].is_object());

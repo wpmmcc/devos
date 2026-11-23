@@ -1,6 +1,6 @@
-use std::path::Path;
-use devos_schema::DevosProject;
 use crate::error::{DevosError, Result};
+use devos_schema::DevosProject;
+use std::path::Path;
 
 pub struct Guardrails;
 
@@ -38,11 +38,15 @@ impl Guardrails {
         let normalized = rel_path.trim_start_matches("./").replace('\\', "/");
         for protected in &project.guardrails.protected_paths {
             let norm_protected = protected.trim_start_matches("./").replace('\\', "/");
-            if normalized == norm_protected || normalized.starts_with(&format!("{}/", norm_protected)) {
+            if normalized == norm_protected
+                || normalized.starts_with(&format!("{}/", norm_protected))
+            {
                 return Err(DevosError::GuardrailBlocked {
                     code: "PATH_PROTECTED".to_string(),
                     reason: format!("Path '{}' is listed in protected_paths", rel_path),
-                    hint: "Protected files must be modified manually by user, not automated agents.".to_string(),
+                    hint:
+                        "Protected files must be modified manually by user, not automated agents."
+                            .to_string(),
                     plain_message: format!(
                         "文件 '{}' 属于项目受保护核心配置，DevOS 安全护栏已拦截自动写入。",
                         rel_path

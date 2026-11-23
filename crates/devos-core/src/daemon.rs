@@ -1,7 +1,7 @@
-use std::path::PathBuf;
-use devos_schema::DaemonInfo;
 use crate::error::{DevosError, Result};
 use crate::fs_utils::{atomic_write_json, read_json};
+use devos_schema::DaemonInfo;
+use std::path::PathBuf;
 
 pub struct DaemonManager;
 
@@ -45,7 +45,10 @@ impl DaemonManager {
             if host_clean != "127.0.0.1" && host_clean != "localhost" {
                 return Err(DevosError::Custom {
                     code: "AUTH_DNS_REBINDING_BLOCKED".to_string(),
-                    message: format!("Invalid Host header '{}': DNS rebinding attack blocked", host),
+                    message: format!(
+                        "Invalid Host header '{}': DNS rebinding attack blocked",
+                        host
+                    ),
                     hint: Some("Requests must target 127.0.0.1 or localhost directly.".to_string()),
                     plain_message: Some("安全拦截：拒绝非本地 Host 头的跨站请求".to_string()),
                 });
@@ -61,7 +64,9 @@ impl DaemonManager {
                 return Err(DevosError::Custom {
                     code: "AUTH_CSRF_BLOCKED".to_string(),
                     message: format!("Untrusted Origin header '{}': CSRF attack blocked", origin),
-                    hint: Some("Cross-origin requests from external web pages are forbidden.".to_string()),
+                    hint: Some(
+                        "Cross-origin requests from external web pages are forbidden.".to_string(),
+                    ),
                     plain_message: Some("安全拦截：拒绝外部网页发起的跨站控制请求".to_string()),
                 });
             }
@@ -97,7 +102,9 @@ impl DaemonManager {
                 code: "DAEMON_NOT_RUNNING".to_string(),
                 message: "Local daemon is not running (daemon.json not found)".to_string(),
                 hint: Some("Start DevOS Desktop or run `devos daemon`.".to_string()),
-                plain_message: Some("DevOS 桌面服务未在运行，正在降级为本地直接读写模式。".to_string()),
+                plain_message: Some(
+                    "DevOS 桌面服务未在运行，正在降级为本地直接读写模式。".to_string(),
+                ),
             });
         }
         read_json(&path)

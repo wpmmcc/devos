@@ -66,6 +66,17 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
   const [apiKey, setApiKey] = useState('sk-live-0192837465abcedf');
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
 
+  // Storage Cleaner State
+  const [storageReport, setStorageReport] = useState<{
+    artifacts_bytes: number;
+    logs_bytes: number;
+    checkpoints_bytes: number;
+    total_project_bytes: number;
+    host_available_gb: number;
+    low_disk_warning: boolean;
+  } | null>(null);
+  const [isLoadingStorage, setIsLoadingStorage] = useState(false);
+
   const toggleShowSecret = (key: string) => {
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -86,9 +97,76 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
     setIsLoadingAgents(false);
   };
 
+  const loadStorageReport = async () => {
+    setIsLoadingStorage(true);
+    try {
+      const res = await Bridge.getStorageReport('.');
+      if (res.ok && res.data) {
+        setStorageReport(res.data);
+      }
+    } finally {
+      setIsLoadingStorage(false);
+    }
+  };
+
+  const handleCleanArtifacts = async () => {
+    try {
+      const res = await Bridge.cleanStorage('.', 30, false);
+      if (res.ok) {
+        const mb = (Number(res.data || 0) / (1024 * 1024)).toFixed(1);
+        showToast(`已成功清理 ${mb} MB 过期截图与日志，磁盘占用已缩减！`);
+        loadStorageReport();
+      }
+    } catch (e: any) {
+      showToast(`清理失败: ${e.message}`);
+    }
+  };
+
+  const handlePruneDocker = async () => {
+    try {
+      const res = await Bridge.cleanStorage('.', 0, true);
+      if (res.ok) {
+        showToast('已修剪标记为 com.devos.managed=true 的 Docker 悬空层缓存！');
+        loadStorageReport();
+      }
+    } catch (e: any) {
+      showToast(`修剪失败: ${e.message}`);
+    }
+  };
+
+  const handleExportBundle = async () => {
+    setIsPackaging(true);
+    try {
+      const res = await Bridge.exportReleaseBundle('.', releaseVersion, isPanelFriendly);
+      if (res.ok && res.data) {
+        const data = res.data;
+        setPackageResult({
+          version: data.version,
+          zip: data.zip_archive_path ? data.zip_archive_path.split(/[\\/]/).pop() : `${project.slug}-${releaseVersion}.zip`,
+          fullZipPath: data.zip_archive_path,
+          gates: (data.preflight_gates || []).map((g: any) => ({
+            name: g.gate_name,
+            passed: g.passed,
+            msg: g.message,
+            details: g.details,
+          })),
+        });
+        showToast(`已成功打出标准交付包 releases/${data.version}/ 并生成独立 zip！`);
+      } else {
+        showToast(`交付包预检未通过: ${res.error?.message || '未知错误'}`);
+      }
+    } catch (err: any) {
+      showToast(`打包失败: ${err.message || String(err)}`);
+    } finally {
+      setIsPackaging(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedAsset === 'agents') {
       loadAgents();
+    } else if (selectedAsset === 'storage') {
+      loadStorageReport();
     }
   }, [selectedAsset]);
 
@@ -500,23 +578,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                   </label>
 
                   <button
-                    onClick={() => {
-                      setIsPackaging(true);
-                      setTimeout(() => {
-                        setIsPackaging(false);
-                        setPackageResult({
-                          version: releaseVersion,
-                          zip: `${project.slug}-${releaseVersion}.zip`,
-                          gates: [
-                            { name: 'Git 工作区洁净检查', passed: true, msg: '状态整洁，无未暂存改动' },
-                            { name: '源码凭据防泄露门禁', passed: true, msg: '未检测到硬编码 API Key 或私钥' },
-                            { name: '生产环境变量模板覆盖', passed: true, msg: '环境变量均已在 .env.prod.example 中登记' },
-                            { name: '生产 Compose 静态校验', passed: true, msg: '具备 restart 策略与 /health 探针' },
-                          ],
-                        });
-                        showToast(`已成功打出标准交付包 releases/${releaseVersion}/ 并生成 zip！`);
-                      }, 700);
-                    }}
+                    onClick={handleExportBundle}
                     disabled={isPackaging}
                     className="ml-auto px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold transition flex items-center gap-1.5 shadow"
                   >
@@ -864,9 +926,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                     治理长期开发导致的磁盘空间黑洞，一键安全清理过期测试截图、构建产物与 Docker 悬空缓存。
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-emerald-400 text-xs font-medium">
+                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium ${
+                  storageReport?.low_disk_warning
+                    ? 'bg-rose-950/40 border border-rose-500/40 text-rose-300'
+                    : 'bg-emerald-950/30 border border-emerald-500/30 text-emerald-400'
+                }`}>
                   <CheckCircle2 size={13} />
-                  <span>磁盘空间充足</span>
+                  <span>{storageReport?.low_disk_warning ? '⚠️ 宿主机磁盘空间不足 5GB！' : '磁盘空间充足'}</span>
                 </div>
               </div>
 
@@ -878,7 +944,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                     <span>宿主机磁盘可用空间 (Host Free Space)</span>
                   </div>
                   <div className="text-2xl font-extrabold text-slate-100 font-mono">
-                    184.2 <span className="text-xs font-normal text-slate-400">GB 可用</span>
+                    {storageReport ? storageReport.host_available_gb.toFixed(1) : '...'} <span className="text-xs font-normal text-slate-400">GB 可用</span>
                   </div>
                   <div className="w-full bg-[#1b212f] h-2 rounded-full overflow-hidden">
                     <div className="bg-emerald-500 h-full w-[24%]" />
@@ -894,20 +960,26 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                     <span>DevOS 项目当前总占用 (Managed Usage)</span>
                   </div>
                   <div className="text-2xl font-extrabold text-slate-100 font-mono">
-                    342.5 <span className="text-xs font-normal text-slate-400">MB</span>
+                    {storageReport ? (storageReport.total_project_bytes / (1024 * 1024)).toFixed(1) : '...'} <span className="text-xs font-normal text-slate-400">MB</span>
                   </div>
                   <div className="text-[11px] text-slate-400 space-y-0.5">
                     <div className="flex justify-between">
                       <span>• 缺陷截图与报表 (.devos/artifacts):</span>
-                      <span className="font-mono text-slate-200">128.4 MB</span>
+                      <span className="font-mono text-slate-200">
+                        {storageReport ? (storageReport.artifacts_bytes / (1024 * 1024)).toFixed(1) : '0.0'} MB
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>• 容器与脚本执行日志 (.devos/logs):</span>
-                      <span className="font-mono text-slate-200">46.2 MB</span>
+                      <span className="font-mono text-slate-200">
+                        {storageReport ? (storageReport.logs_bytes / (1024 * 1024)).toFixed(1) : '0.0'} MB
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>• 历史时光机轻量快照 (.devos/snapshots):</span>
-                      <span className="font-mono text-slate-200">167.9 MB</span>
+                      <span>• 历史时光机轻量快照 (.devos/checkpoints):</span>
+                      <span className="font-mono text-slate-200">
+                        {storageReport ? (storageReport.checkpoints_bytes / (1024 * 1024)).toFixed(1) : '0.0'} MB
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -929,7 +1001,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                       </div>
                     </div>
                     <button
-                      onClick={() => showToast('已成功清理 174 MB 过期截图与日志，磁盘占用已缩减！')}
+                      onClick={handleCleanArtifacts}
+                      disabled={isLoadingStorage}
                       className="mt-3 py-1.5 bg-[#1b2233] hover:bg-[#232c42] text-slate-200 hover:text-white rounded text-xs font-semibold border border-[#2e3a52] transition flex items-center justify-center gap-1"
                     >
                       <Trash2 size={12} className="text-rose-400" />
@@ -945,7 +1018,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                       </div>
                     </div>
                     <button
-                      onClick={() => showToast('已执行 Docker 缓存修剪，成功释放 1.2 GB 悬空层！')}
+                      onClick={handlePruneDocker}
+                      disabled={isLoadingStorage}
                       className="mt-3 py-1.5 bg-[#1b2233] hover:bg-[#232c42] text-slate-200 hover:text-white rounded text-xs font-semibold border border-[#2e3a52] transition flex items-center justify-center gap-1"
                     >
                       <RefreshCw size={12} className="text-cyan-400" />

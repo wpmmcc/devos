@@ -1,9 +1,9 @@
+use crate::error::{DevosError, Result};
+use crate::fs_utils::{atomic_write_json, read_json};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use serde::{Deserialize, Serialize};
-use crate::error::{DevosError, Result};
-use crate::fs_utils::{atomic_write_json, read_json};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Checkpoint {
@@ -91,13 +91,19 @@ impl CheckpointManager {
                     if !tree_id.is_empty() {
                         // Create detached commit
                         let commit_out = Command::new("git")
-                            .args(["commit-tree", &tree_id, "-m", &format!("DevOS Checkpoint: {}", note)])
+                            .args([
+                                "commit-tree",
+                                &tree_id,
+                                "-m",
+                                &format!("DevOS Checkpoint: {}", note),
+                            ])
                             .current_dir(root)
                             .output();
 
                         if let Ok(cout) = commit_out {
                             if cout.status.success() {
-                                let commit_id = String::from_utf8_lossy(&cout.stdout).trim().to_string();
+                                let commit_id =
+                                    String::from_utf8_lossy(&cout.stdout).trim().to_string();
                                 // Update hidden ref: refs/devos/checkpoints/<id>
                                 let ref_name = format!("refs/devos/checkpoints/{}", id);
                                 let _ = Command::new("git")
@@ -153,7 +159,9 @@ impl CheckpointManager {
                     code: "CHECKPOINT_RESTORE_FAILED".to_string(),
                     message: String::from_utf8_lossy(&out.stderr).to_string(),
                     hint: Some("Inspect git status for conflicted working files.".to_string()),
-                    plain_message: Some("历史时光机还原失败，请检查工作区是否有未保存文件".to_string()),
+                    plain_message: Some(
+                        "历史时光机还原失败，请检查工作区是否有未保存文件".to_string(),
+                    ),
                 }),
                 Err(e) => Err(DevosError::Io(e)),
             }

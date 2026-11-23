@@ -24,25 +24,37 @@ pub use checkpoint::{Checkpoint, CheckpointManager};
 pub use command_bus::CommandBus;
 pub use daemon::DaemonManager;
 pub use db::{ActivityEvent, Database};
-pub use deploy_plugin::{DeployPlan, DeployPluginManager, DeployPluginMetadata, DeployProgressEvent, DeployResult, ValidationResult};
+pub use deploy_plugin::{
+    DeployPlan, DeployPluginManager, DeployPluginMetadata, DeployProgressEvent, DeployResult,
+    ValidationResult,
+};
 pub use error::{DevosError, Result};
-pub use fs_utils::{atomic_write, atomic_write_json, ensure_within_root, read_json, read_to_string, to_posix_path};
+pub use fs_utils::{
+    atomic_write, atomic_write_json, ensure_within_root, read_json, read_to_string, to_posix_path,
+};
 pub use guardrail::Guardrails;
 pub use issue::IssueManager;
-pub use logging::{export_diagnostic_bundle, get_runtime_logs, log_runtime_line, sanitize_text, DiagnosticBundle};
+pub use logging::{
+    export_diagnostic_bundle, get_runtime_logs, log_runtime_line, sanitize_text, DiagnosticBundle,
+};
 pub use mirror::{DownloadProgress, MirrorManager, MirrorPreset, MirrorRaceResult, MirrorsConfig};
 pub use port::{PortAllocation, PortOccupant, PortRegistry};
-pub use process_env::{configure_child_process_group, diagnose_proxy_env, get_devos_bin_dir, inject_proxy_bypass_env, kill_process_tree, ProxyDiagnosticInfo, DEFAULT_NO_PROXY};
+pub use process_env::{
+    configure_child_process_group, diagnose_proxy_env, get_devos_bin_dir, inject_proxy_bypass_env,
+    kill_process_tree, ProxyDiagnosticInfo, DEFAULT_NO_PROXY,
+};
 pub use project::{ProjectManager, DEVOS_MANAGED_LABEL};
-pub use release::{PreflightGateResult, ReleaseBuildResult, ReleaseHealthCheck, ReleaseManager, ReleaseManifest};
+pub use release::{
+    PreflightGateResult, ReleaseBuildResult, ReleaseHealthCheck, ReleaseManager, ReleaseManifest,
+};
 pub use storage_cleaner::{StorageCleaner, StorageReport};
 pub use watcher::{ProjectChangeEvent, ProjectWatcher};
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use devos_schema::{BoardColumn, ProjectType};
+    use tempfile::tempdir;
 
     #[test]
     fn test_project_init_and_board_lifecycle() {
@@ -58,7 +70,8 @@ mod tests {
             "Description of project",
             ProjectType::Hybrid,
             Some(&db),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(project.slug, "my-project");
         assert!(project_dir.join("devos.json").exists());
@@ -75,7 +88,8 @@ mod tests {
             "user",
             None,
             None,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(card.card_id, "CARD-001");
 
         // 3. Agent cannot move to Done directly
@@ -97,16 +111,15 @@ mod tests {
             &project,
             "CARD-001",
             "数据导出模块已完成，提供 3 条验收测试",
-            vec![
-                devos_schema::ChecklistStep {
-                    step: 1,
-                    action: "运行脚本".to_string(),
-                    expected: "生成 xlsx 文件".to_string(),
-                    checked: false,
-                }
-            ],
+            vec![devos_schema::ChecklistStep {
+                step: 1,
+                action: "运行脚本".to_string(),
+                expected: "生成 xlsx 文件".to_string(),
+                checked: false,
+            }],
             vec!["export_task".to_string()],
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(submitted.column, BoardColumn::Testing);
 
         // 5. Create issue
@@ -121,7 +134,8 @@ mod tests {
             devos_schema::CapturedContext::default(),
             Some("CARD-001".to_string()),
             Some(1),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(issue.issue_id, "ISS-001");
 
         // 6. Resolve issue
@@ -131,8 +145,12 @@ mod tests {
             "ISS-001",
             "已在 scripts/export.py 中补充 amount 字段映射",
             vec!["scripts/export.py".to_string()],
-            Some(("Excel 导出字段映射规范".to_string(), "导出字段必须全量包含 schema 字段。".to_string())),
-        ).unwrap();
+            Some((
+                "Excel 导出字段映射规范".to_string(),
+                "导出字段必须全量包含 schema 字段。".to_string(),
+            )),
+        )
+        .unwrap();
         assert_eq!(resolved.status, devos_schema::IssueStatus::ReadyForRetest);
         assert!(project_dir.join("knowledge/KB-ISS-001.md").exists());
 
@@ -143,8 +161,12 @@ mod tests {
             "ISS-001",
             "Claude Code",
             "sess_12345",
-        ).unwrap();
-        assert_eq!(claim_res.claimed_by.as_ref().unwrap().agent_name, "Claude Code");
+        )
+        .unwrap();
+        assert_eq!(
+            claim_res.claimed_by.as_ref().unwrap().agent_name,
+            "Claude Code"
+        );
 
         // Concurrent claim by another session should be rejected
         let conflict_claim = IssueManager::claim_issue(
@@ -161,7 +183,8 @@ mod tests {
             &project_dir,
             "Initial setup checkpoint",
             "user_manual",
-        ).unwrap();
+        )
+        .unwrap();
         assert!(cp.id.starts_with("cp_"));
 
         let checkpoints = CheckpointManager::list_checkpoints(&project_dir).unwrap();
@@ -169,16 +192,17 @@ mod tests {
         assert_eq!(checkpoints[0].note, "Initial setup checkpoint");
 
         // 9. Test Release Manager (Phase 9)
-        let release_res = ReleaseManager::prepare_release_artifacts(
-            &project_dir,
-            &project,
-            "1.0.0",
-            true,
-        ).unwrap();
+        let release_res =
+            ReleaseManager::prepare_release_artifacts(&project_dir, &project, "1.0.0", true)
+                .unwrap();
         assert_eq!(release_res.version, "v1.0.0");
-        assert!(project_dir.join("releases/v1.0.0/release-manifest.json").exists());
+        assert!(project_dir
+            .join("releases/v1.0.0/release-manifest.json")
+            .exists());
         assert!(project_dir.join("releases/v1.0.0/DEPLOY.md").exists());
-        assert!(project_dir.join("releases/v1.0.0/deploy/docker-compose.prod.yml").exists());
+        assert!(project_dir
+            .join("releases/v1.0.0/deploy/docker-compose.prod.yml")
+            .exists());
 
         // 10. Test Deploy Plugin Manager (Phase 9)
         let plugins = DeployPluginManager::list_plugins();
@@ -192,7 +216,9 @@ mod tests {
         assert!(val.connected);
 
         // 11. Test Path Validator & Demo Project (Phase 10)
-        let warnings = ProjectManager::validate_project_workspace_path(std::path::Path::new("C:\\Users\\张三\\OneDrive\\我的项目"));
+        let warnings = ProjectManager::validate_project_workspace_path(std::path::Path::new(
+            "C:\\Users\\张三\\OneDrive\\我的项目",
+        ));
         assert!(!warnings.is_empty());
         assert!(warnings.iter().any(|w| w.contains("OneDrive")));
         assert!(warnings.iter().any(|w| w.contains("中文")));

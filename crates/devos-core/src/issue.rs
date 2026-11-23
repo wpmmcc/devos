@@ -1,10 +1,10 @@
-use std::path::Path;
+use crate::error::{DevosError, Result};
+use crate::fs_utils::{atomic_write, atomic_write_json, read_json};
 use devos_schema::{
     CapturedContext, DevosProject, Issue, IssueClaim, IssueResolution, IssueSeverity, IssueStatus,
     RetestRecord, SourceType, UserReport,
 };
-use crate::error::{DevosError, Result};
-use crate::fs_utils::{atomic_write, atomic_write_json, read_json};
+use std::path::Path;
 
 pub struct IssueManager;
 
@@ -29,7 +29,9 @@ impl IssueManager {
                         None | Some("all") => true,
                         Some("open") => matches!(issue.status, IssueStatus::Open),
                         Some("in_progress") => matches!(issue.status, IssueStatus::InProgress),
-                        Some("ready_for_retest") => matches!(issue.status, IssueStatus::ReadyForRetest),
+                        Some("ready_for_retest") => {
+                            matches!(issue.status, IssueStatus::ReadyForRetest)
+                        }
                         Some("closed") => matches!(issue.status, IssueStatus::Closed),
                         Some("reopened") => matches!(issue.status, IssueStatus::Reopened),
                         _ => true,
@@ -135,8 +137,13 @@ impl IssueManager {
                         "Issue {} is already claimed by {} (session {})",
                         issue_id, claim.agent_name, claim.session_id
                     ),
-                    hint: Some("Wait for the other agent to finish or coordinate with user.".to_string()),
-                    plain_message: Some(format!("该问题正由 {} 处理中（30分钟内有效），避免重复处理", claim.agent_name)),
+                    hint: Some(
+                        "Wait for the other agent to finish or coordinate with user.".to_string(),
+                    ),
+                    plain_message: Some(format!(
+                        "该问题正由 {} 处理中（30分钟内有效），避免重复处理",
+                        claim.agent_name
+                    )),
                 });
             }
         }

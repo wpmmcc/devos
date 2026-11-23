@@ -24,6 +24,7 @@ interface TopBarProps {
   testingCount: number;
   onOpenCommandPalette?: () => void;
   onOpenSettings?: () => void;
+  onOpenTimeMachine?: () => void;
   onShowToast?: (type: 'success' | 'info' | 'warning' | 'error', msg: string) => void;
 }
 
@@ -35,6 +36,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   testingCount,
   onOpenCommandPalette,
   onOpenSettings,
+  onOpenTimeMachine,
   onShowToast,
 }) => {
   const { t, i18n } = useTranslation();
@@ -78,9 +80,13 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   const handleUndoRecentChange = () => {
     if (!project) return;
-    const ok = window.confirm(t('topbar.undoConfirm'));
-    if (!ok) return;
-    onShowToast?.('info', t('topbar.undoSuccess'));
+    if (onOpenTimeMachine) {
+      onOpenTimeMachine();
+    } else {
+      const ok = window.confirm(t('topbar.undoConfirm'));
+      if (!ok) return;
+      onShowToast?.('info', t('topbar.undoSuccess'));
+    }
   };
 
   if (!project) {

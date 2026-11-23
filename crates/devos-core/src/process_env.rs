@@ -124,6 +124,8 @@ pub fn kill_process_tree(pid: u32) {
     #[cfg(windows)]
     {
         let pid_str = pid.to_string();
-        let _ = Command::new("taskkill").args(["/F", "/T", "/PID", &pid_str]).output();
+        let _ = Command::new("taskkill")
+            .args(["/F", "/T", "/PID", &pid_str])
+            .output();
     }
 }

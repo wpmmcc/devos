@@ -1,6 +1,6 @@
+use crate::error::Result;
 use rusqlite::{params, Connection};
 use std::path::Path;
-use crate::error::Result;
 
 pub struct Database {
     conn: Connection,
@@ -111,7 +111,7 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_issues_proj ON issues(project_id, status);
             CREATE INDEX IF NOT EXISTS idx_assets_proj ON assets(project_id, asset_type);
             CREATE INDEX IF NOT EXISTS idx_activity_proj ON activity_events(project_id, created_at);
-            "#
+            "#,
         )?;
         Ok(())
     }
@@ -223,13 +223,17 @@ impl Database {
         Ok(())
     }
 
+    pub fn remove_recent_project(&self, path: &str) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM recent_projects WHERE path = ?1", params![path])?;
+        Ok(())
+    }
+
     pub fn list_recent_projects(&self) -> Result<Vec<(String, String, String)>> {
         let mut stmt = self.conn.prepare(
             "SELECT path, name, project_type FROM recent_projects ORDER BY last_opened_at DESC LIMIT 10"
         )?;
-        let rows = stmt.query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?;
 
         let mut res = Vec::new();
         for r in rows {
@@ -241,9 +245,9 @@ impl Database {
     }
 
     pub fn get_last_active_project(&self) -> Result<Option<String>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT path FROM recent_projects ORDER BY last_opened_at DESC LIMIT 1"
-        )?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT path FROM recent_projects ORDER BY last_opened_at DESC LIMIT 1")?;
         let mut rows = stmt.query([])?;
         if let Some(row) = rows.next()? {
             let path: String = row.get(0)?;
@@ -272,14 +276,10 @@ impl Database {
         Ok(self.conn.last_insert_rowid())
     }
 
-    pub fn list_activities(
-        &self,
-        project_id: &str,
-        limit: usize,
-    ) -> Result<Vec<ActivityEvent>> {
+    pub fn list_activities(&self, project_id: &str, limit: usize) -> Result<Vec<ActivityEvent>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, project_id, event_type, actor, summary_plain, details_json, created_at
-             FROM activity_events WHERE project_id = ?1 ORDER BY id DESC LIMIT ?2"
+             FROM activity_events WHERE project_id = ?1 ORDER BY id DESC LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![project_id, limit as i64], |row| {
             Ok(ActivityEvent {

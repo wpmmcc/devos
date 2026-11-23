@@ -1,12 +1,12 @@
+use crate::db::Database;
+use crate::error::Result;
+use crate::fs_utils::{atomic_write_json, read_json};
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
-use regex::Regex;
-use serde::{Deserialize, Serialize};
-use crate::db::Database;
-use crate::error::Result;
-use crate::fs_utils::{atomic_write_json, read_json};
 
 pub struct RingBufferLogger {
     buffer: VecDeque<String>,
@@ -34,7 +34,10 @@ impl RingBufferLogger {
             .filter(|l| {
                 if only_errors {
                     let lower = l.to_lowercase();
-                    lower.contains("error") || lower.contains("fatal") || lower.contains("fail") || lower.contains("exception")
+                    lower.contains("error")
+                        || lower.contains("fatal")
+                        || lower.contains("fail")
+                        || lower.contains("exception")
                 } else {
                     true
                 }
@@ -86,7 +89,9 @@ pub fn sanitize_text(raw: &str) -> String {
         s = re_sk.replace_all(&s, "sk-[REDACTED_API_KEY]").to_string();
     }
     if let Ok(re_gh) = Regex::new(r"gh[pousr]_[A-Za-z0-9]{20,}") {
-        s = re_gh.replace_all(&s, "ghp_[REDACTED_GITHUB_TOKEN]").to_string();
+        s = re_gh
+            .replace_all(&s, "ghp_[REDACTED_GITHUB_TOKEN]")
+            .to_string();
     }
     if let Ok(re_pwd) = Regex::new(r"(?i)(password|secret|passwd)=([^\s&]+)") {
         s = re_pwd.replace_all(&s, "$1=[REDACTED]").to_string();
@@ -126,14 +131,20 @@ pub fn export_diagnostic_bundle(project_root: Option<&Path>) -> Result<PathBuf> 
         let manifest_path = root.join("devos.json");
         if manifest_path.exists() {
             if let Ok(val) = read_json::<_, serde_json::Value>(&manifest_path) {
-                project_slug = val.get("slug").and_then(|s| s.as_str()).map(|s| s.to_string());
+                project_slug = val
+                    .get("slug")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string());
             }
         }
     }
 
     if let Ok(db) = Database::open_global() {
         if let Ok(acts) = db.list_activities(project_slug.as_deref().unwrap_or(""), 20) {
-            recent_acts = acts.into_iter().map(|a| format!("[{}] {}: {}", a.created_at, a.actor, a.summary_plain)).collect();
+            recent_acts = acts
+                .into_iter()
+                .map(|a| format!("[{}] {}: {}", a.created_at, a.actor, a.summary_plain))
+                .collect();
         }
     }
 

@@ -13,6 +13,7 @@ import { CreateIssueModal } from './components/CreateIssueModal';
 import { ConflictDoctorModal } from './components/ConflictDoctorModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { SettingsModal } from './components/SettingsModal';
+import { TimeMachineModal } from './components/TimeMachineModal';
 import { ToastContainer, ToastItem } from './components/ToastContainer';
 import { switchLanguage } from './i18n';
 import {
@@ -45,6 +46,7 @@ export const App: React.FC = () => {
   const [isTrustModalOpen, setIsTrustModalOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
   // Toasts state
@@ -294,6 +296,7 @@ export const App: React.FC = () => {
           testingCount={testingCount}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenTimeMachine={() => setIsTimeMachineOpen(true)}
           onShowToast={(type, msg) => addToast(type, msg)}
         />
 
@@ -389,9 +392,7 @@ export const App: React.FC = () => {
         }}
         onTimeMachine={() => {
           if (!project) return;
-          if (window.confirm(t('topbar.undoConfirm'))) {
-            addToast('info', t('topbar.undoSuccess'));
-          }
+          setIsTimeMachineOpen(true);
         }}
         onSwitchLang={() => {
           const next = i18n.language.startsWith('zh') ? 'en-US' : 'zh-CN';
@@ -410,6 +411,12 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      <TimeMachineModal
+        isOpen={isTimeMachineOpen}
+        onClose={() => setIsTimeMachineOpen(false)}
+        projectPath={currentProjectPath}
       />
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />

@@ -1,9 +1,9 @@
+use crate::doctor::PreflightDoctor;
+use crate::driver::{DiagnosticItem, EnvDriver, EnvStatus, ExecResult};
+use devos_core::{inject_proxy_bypass_env, DevosError, Result};
 use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
-use devos_core::{inject_proxy_bypass_env, DevosError, Result};
-use crate::doctor::PreflightDoctor;
-use crate::driver::{DiagnosticItem, EnvDriver, EnvStatus, ExecResult};
 
 fn get_dc_command() -> Command {
     if let Some(bin) = PreflightDoctor::get_devcontainer_binary() {
@@ -43,7 +43,8 @@ impl EnvDriver for DevcontainerDriver {
             code: "DEVCONTAINER_NOT_INSTALLED".to_string(),
             message: format!("Failed to run devcontainer up: {}", e),
             hint: "Install @devcontainers/cli via `npm install -g @devcontainers/cli`.".to_string(),
-            plain_message: "启动 Dev Container 引擎失败，请检查 @devcontainers/cli 是否已安装。".to_string(),
+            plain_message: "启动 Dev Container 引擎失败，请检查 @devcontainers/cli 是否已安装。"
+                .to_string(),
         })?;
 
         if !output.status.success() {
@@ -52,7 +53,8 @@ impl EnvDriver for DevcontainerDriver {
                 code: "DEVCONTAINER_UP_ERROR".to_string(),
                 message: stderr.to_string(),
                 hint: "Inspect .devcontainer/devcontainer.json syntax and Docker logs.".to_string(),
-                plain_message: "后端脚本沙盒容器构建或启动失败，请检查 Docker 服务与配置文件。".to_string(),
+                plain_message: "后端脚本沙盒容器构建或启动失败，请检查 Docker 服务与配置文件。"
+                    .to_string(),
             });
         }
 
@@ -62,7 +64,12 @@ impl EnvDriver for DevcontainerDriver {
     fn down(&self, project_root: &Path) -> Result<()> {
         let folder_str = project_root.display().to_string();
         let mut ps_cmd = Command::new("docker");
-        ps_cmd.args(["ps", "-q", "--filter", &format!("label=vsch.local.folder={}", folder_str)]);
+        ps_cmd.args([
+            "ps",
+            "-q",
+            "--filter",
+            &format!("label=vsch.local.folder={}", folder_str),
+        ]);
         inject_proxy_bypass_env(&mut ps_cmd);
 
         let _ = ps_cmd.output().and_then(|out| {

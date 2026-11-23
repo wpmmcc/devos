@@ -85,7 +85,10 @@ impl DevosError {
     pub fn plain_message(&self) -> String {
         match self {
             Self::ProjectNotFound { path } => {
-                format!("未在目录 {} 中找到有效的 DevOS 项目配置文件 (devos.json)", path)
+                format!(
+                    "未在目录 {} 中找到有效的 DevOS 项目配置文件 (devos.json)",
+                    path
+                )
             }
             Self::GuardrailBlocked { plain_message, .. } => plain_message.clone(),
             Self::EnvironmentError { plain_message, .. } => plain_message.clone(),
@@ -94,9 +97,11 @@ impl DevosError {
                 format!("端口 {} 已被占用，请先关闭占用程序或在设置中更换端口", port)
             }
             Self::Unauthorized { .. } => "鉴权失败，本地连接令牌无效或已过期".to_string(),
-            Self::Custom { plain_message, message, .. } => {
-                plain_message.clone().unwrap_or_else(|| message.clone())
-            }
+            Self::Custom {
+                plain_message,
+                message,
+                ..
+            } => plain_message.clone().unwrap_or_else(|| message.clone()),
             _ => self.to_string(),
         }
     }
