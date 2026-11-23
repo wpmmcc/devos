@@ -8,6 +8,7 @@ import {
   Bug,
   BookOpen,
   Bot,
+  Radio,
 } from 'lucide-react';
 import { DevosProject, RecentProjectDto } from '../types';
 
@@ -21,6 +22,7 @@ interface SidebarProps {
   onSelectProjectByPath: (path: string) => void;
   onOpenNewProject: () => void;
   onOpenDoctor: () => void;
+  onOpenConflictDoctor?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -33,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectProjectByPath,
   onOpenNewProject,
   onOpenDoctor,
+  onOpenConflictDoctor,
 }) => {
   return (
     <aside className="w-[220px] bg-[#12151d] border-r border-[#1e2330] flex flex-col justify-between shrink-0 h-screen select-none">
@@ -191,6 +194,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Stethoscope size={14} className="text-emerald-400" />
           <span>环境体检 (Doctor)</span>
         </button>
+
+        {onOpenConflictDoctor && (
+          <button
+            onClick={onOpenConflictDoctor}
+            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-[#1a1f2c] rounded-lg transition"
+          >
+            <Radio size={14} className="text-amber-400" />
+            <span>端口冲突诊断 (Conflict)</span>
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -1,6 +1,7 @@
 use devos_core::{
     ensure_within_root, fs_utils::read_json, AgentConfigManager, BoardManager, Database, DevosError,
-    Guardrails, IssueManager, ProjectChangeEvent, ProjectManager, ProjectWatcher, Result,
+    Guardrails, IssueManager, PortOccupant, PortRegistry, ProjectChangeEvent, ProjectManager,
+    ProjectWatcher, Result,
 };
 use devos_env::{
     DdevDriver, DevcontainerDriver, DiagnosticItem, EnvDriver, EnvStatus, PreflightDoctor,
@@ -10,12 +11,14 @@ use devos_schema::{
     ProjectType, RunManifest, SourceType,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Instant;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 struct ActiveWatcherState(Mutex<Option<ProjectWatcher>>);
+struct ActiveEnvLocks(Mutex<HashSet<PathBuf>>);
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RecentProjectDto {
@@ -393,6 +396,33 @@ fn execute_script_target(
     to_api_resp(res)
 }
 
+fn with_env_lock<F, R>(locks_state: &State<'_, ActiveEnvLocks>, project_root: &Path, f: F) -> Result<R>
+where
+    F: FnOnce() -> Result<R>,
+{
+    let canonical = project_root.canonicalize().unwrap_or_else(|_| project_root.to_path_buf());
+    {
+        let mut locks = locks_state.0.lock().unwrap();
+        if locks.contains(&canonical) {
+            return Err(DevosError::Custom {
+                code: "ENV_BUSY".to_string(),
+                message: "An environment operation is already in progress for this project".to_string(),
+                hint: Some("Please wait for the current environment operation to complete.".to_string()),
+                plain_message: Some("该项目环境正在执行其他操作（启动/停止/快照），请稍候...".to_string()),
+            });
+        }
+        locks.insert(canonical.clone());
+    }
+
+    let res = f();
+
+    if let Ok(mut locks) = locks_state.0.lock() {
+        locks.remove(&canonical);
+    }
+
+    res
+}
+
 #[tauri::command]
 fn get_env_status(project_path: String, target: String) -> ApiResponse<EnvStatus> {
     let res = (|| -> Result<EnvStatus> {
@@ -407,35 +437,51 @@ fn get_env_status(project_path: String, target: String) -> ApiResponse<EnvStatus
 }
 
 #[tauri::command]
-fn start_environment(project_path: String, target: String) -> ApiResponse<EnvStatus> {
+fn start_environment(
+    env_locks: State<'_, ActiveEnvLocks>,
+    project_path: String,
+    target: String,
+) -> ApiResponse<EnvStatus> {
     let res = (|| -> Result<EnvStatus> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
-        let driver: Box<dyn EnvDriver> = match (target.as_str(), &project.project_type) {
-            ("script", _) => Box::new(DevcontainerDriver::new()),
-            _ => Box::new(DdevDriver::new()),
-        };
-        driver.up(&root)
+        with_env_lock(&env_locks, &root, || {
+            let driver: Box<dyn EnvDriver> = match (target.as_str(), &project.project_type) {
+                ("script", _) => Box::new(DevcontainerDriver::new()),
+                _ => Box::new(DdevDriver::new()),
+            };
+            driver.up(&root)
+        })
     })();
     to_api_resp(res)
 }
 
 #[tauri::command]
-fn stop_environment(project_path: String, target: String) -> ApiResponse<bool> {
+fn stop_environment(
+    env_locks: State<'_, ActiveEnvLocks>,
+    project_path: String,
+    target: String,
+) -> ApiResponse<bool> {
     let res = (|| -> Result<bool> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
         Guardrails::check_destructive_allowed(&project, "down")?;
-        let driver: Box<dyn EnvDriver> = match (target.as_str(), &project.project_type) {
-            ("script", _) => Box::new(DevcontainerDriver::new()),
-            _ => Box::new(DdevDriver::new()),
-        };
-        driver.down(&root)?;
-        Ok(true)
+        with_env_lock(&env_locks, &root, || {
+            let driver: Box<dyn EnvDriver> = match (target.as_str(), &project.project_type) {
+                ("script", _) => Box::new(DevcontainerDriver::new()),
+                _ => Box::new(DdevDriver::new()),
+            };
+            driver.down(&root)?;
+            Ok(true)
+        })
     })();
     to_api_resp(res)
 }
 
 #[tauri::command]
-fn create_snapshot(project_path: String, name: String) -> ApiResponse<String> {
+fn create_snapshot(
+    env_locks: State<'_, ActiveEnvLocks>,
+    project_path: String,
+    name: String,
+) -> ApiResponse<String> {
     let res = (|| -> Result<String> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
         let snap_name = if name.trim().is_empty() {
@@ -443,27 +489,81 @@ fn create_snapshot(project_path: String, name: String) -> ApiResponse<String> {
         } else {
             name.trim().to_string()
         };
-        let driver: Box<dyn EnvDriver> = match project.project_type {
-            ProjectType::Script => Box::new(DevcontainerDriver::new()),
-            _ => Box::new(DdevDriver::new()),
-        };
-        driver.snapshot(&root, &snap_name)?;
-        Ok(snap_name)
+        with_env_lock(&env_locks, &root, || {
+            let driver: Box<dyn EnvDriver> = match project.project_type {
+                ProjectType::Script => Box::new(DevcontainerDriver::new()),
+                _ => Box::new(DdevDriver::new()),
+            };
+            driver.snapshot(&root, &snap_name)?;
+            Ok(snap_name)
+        })
     })();
     to_api_resp(res)
 }
 
 #[tauri::command]
-fn restore_snapshot(project_path: String, name: String) -> ApiResponse<String> {
+fn restore_snapshot(
+    env_locks: State<'_, ActiveEnvLocks>,
+    project_path: String,
+    name: String,
+) -> ApiResponse<String> {
     let res = (|| -> Result<String> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
         Guardrails::check_destructive_allowed(&project, "restore")?;
-        let driver: Box<dyn EnvDriver> = match project.project_type {
-            ProjectType::Script => Box::new(DevcontainerDriver::new()),
-            _ => Box::new(DdevDriver::new()),
-        };
-        driver.restore(&root, &name)?;
-        Ok(name)
+        with_env_lock(&env_locks, &root, || {
+            let driver: Box<dyn EnvDriver> = match project.project_type {
+                ProjectType::Script => Box::new(DevcontainerDriver::new()),
+                _ => Box::new(DdevDriver::new()),
+            };
+            driver.restore(&root, &name)?;
+            Ok(name)
+        })
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn inspect_port_occupant(port: u16) -> ApiResponse<PortOccupant> {
+    let occ = PortRegistry::inspect_port_occupant(port);
+    ApiResponse::success(occ)
+}
+
+#[tauri::command]
+fn reconfigure_web_ports(
+    project_path: String,
+    http_port: u16,
+    https_port: u16,
+) -> ApiResponse<String> {
+    let res = (|| -> Result<String> {
+        let (root, mut project) = ProjectManager::find_and_load(&project_path)?;
+        let mut cfg_cmd = std::process::Command::new("ddev");
+        cfg_cmd
+            .args([
+                "config",
+                &format!("--router-http-port={}", http_port),
+                &format!("--router-https-port={}", https_port),
+            ])
+            .current_dir(&root);
+        devos_core::inject_proxy_bypass_env(&mut cfg_cmd);
+        let _ = cfg_cmd.output();
+
+        // Update devos.json primary_url
+        if let Some(ref mut web) = project.environments.web {
+            let scheme = if https_port == 443 { "https" } else { "http" };
+            let port_str = if http_port == 80 && scheme == "http" {
+                "".to_string()
+            } else if https_port == 443 && scheme == "https" {
+                "".to_string()
+            } else if scheme == "https" {
+                format!(":{}", https_port)
+            } else {
+                format!(":{}", http_port)
+            };
+            web.primary_url = format!("{}://{}.ddev.site{}", scheme, project.slug, port_str);
+            devos_core::atomic_write_json(root.join("devos.json"), &project)?;
+        }
+
+        Ok(format!("端口已切换并更新至 HTTP: {}, HTTPS: {}", http_port, https_port))
     })();
     to_api_resp(res)
 }
@@ -485,8 +585,15 @@ fn apply_agent_config(agent_id: String, project_path: Option<String>) -> ApiResp
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .manage(ActiveWatcherState(Mutex::new(None)))
+        .manage(ActiveEnvLocks(Mutex::new(HashSet::new())))
         .invoke_handler(tauri::generate_handler![
             run_preflight_doctor,
             get_recent_projects,
@@ -506,7 +613,9 @@ pub fn run() {
             create_snapshot,
             restore_snapshot,
             detect_installed_agents,
-            apply_agent_config
+            apply_agent_config,
+            inspect_port_occupant,
+            reconfigure_web_ports
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

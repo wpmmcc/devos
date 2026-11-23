@@ -1,7 +1,41 @@
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use crate::error::{DevosError, Result};
+
+fn echo_cache() -> &'static Mutex<HashMap<PathBuf, Instant>> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, Instant>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Record that DevOS internally wrote to this path, so file watchers can ignore this echo
+pub fn record_self_write(path: &Path) {
+    if let Ok(mut cache) = echo_cache().lock() {
+        let now = Instant::now();
+        cache.retain(|_, time| now.duration_since(*time) < Duration::from_secs(5));
+        let key = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        cache.insert(key, now);
+    }
+}
+
+/// Check if a path was modified by DevOS within the given timeout (e.g. 600ms)
+pub fn is_self_write_echo(path: &Path, window: Duration) -> bool {
+    if let Ok(mut cache) = echo_cache().lock() {
+        let now = Instant::now();
+        cache.retain(|_, time| now.duration_since(*time) < Duration::from_secs(5));
+
+        let key = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        if let Some(time) = cache.get(&key) {
+            if now.duration_since(*time) <= window {
+                return true;
+            }
+        }
+    }
+    false
+}
 
 /// Atomically write content to a file by writing to a temporary file in the same directory,
 /// ensuring standard LF line endings, and then renaming it.
@@ -32,6 +66,9 @@ pub fn atomic_write<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, content: C) -> Resu
         let _ = fs::remove_file(&tmp_path);
         DevosError::Io(e)
     })?;
+
+    // Record internal write for watcher echo cancellation
+    record_self_write(path);
 
     Ok(())
 }

@@ -43,6 +43,11 @@ impl ProjectWatcher {
                             }
                         }
 
+                        // Suppress echo loops from DevOS's own atomic writes (within 600ms)
+                        if crate::fs_utils::is_self_write_echo(&path, std::time::Duration::from_millis(600)) {
+                            continue;
+                        }
+
                         let relative = path.strip_prefix(&root_path).unwrap_or(&path);
                         let rel_str = relative.to_string_lossy();
 

@@ -9,9 +9,39 @@ impl PreflightDoctor {
         results.push(Self::check_docker());
         results.push(Self::check_ddev());
         results.push(Self::check_devcontainer());
+        results.push(Self::check_proxy_bypass());
         #[cfg(target_os = "windows")]
         results.push(Self::check_wsl());
         results
+    }
+
+    pub fn check_proxy_bypass() -> DiagnosticItem {
+        let info = devos_core::diagnose_proxy_env();
+        if !info.has_proxy {
+            DiagnosticItem {
+                key: "proxy".to_string(),
+                title: "本地网络代理环境".to_string(),
+                status: DiagnosticStatus::Ok,
+                message: "未检测到代理劫持风险，本地直连正常".to_string(),
+                fix_hint: None,
+            }
+        } else if info.is_bypassed_properly {
+            DiagnosticItem {
+                key: "proxy".to_string(),
+                title: "本地网络代理环境".to_string(),
+                status: DiagnosticStatus::Ok,
+                message: "检测到代理软件，本地回环白名单已生效".to_string(),
+                fix_hint: None,
+            }
+        } else {
+            DiagnosticItem {
+                key: "proxy".to_string(),
+                title: "本地网络代理环境".to_string(),
+                status: DiagnosticStatus::Warning,
+                message: "检测到代理软件，DevOS 子进程将强制注入 NO_PROXY 规避劫持".to_string(),
+                fix_hint: Some("若遇到容器无法访问，请检查代理客户端（如 Clash/v2rayN）是否勾选了绕过本地回环地址。".to_string()),
+            }
+        }
     }
 
     pub fn check_docker() -> DiagnosticItem {

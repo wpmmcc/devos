@@ -7,6 +7,7 @@ pub mod fs_utils;
 pub mod guardrail;
 pub mod issue;
 pub mod port;
+pub mod process_env;
 pub mod project;
 pub mod watcher;
 
@@ -18,8 +19,9 @@ pub use error::{DevosError, Result};
 pub use fs_utils::{atomic_write, atomic_write_json, ensure_within_root, read_json, read_to_string, to_posix_path};
 pub use guardrail::Guardrails;
 pub use issue::IssueManager;
-pub use port::{PortAllocation, PortRegistry};
-pub use project::ProjectManager;
+pub use port::{PortAllocation, PortOccupant, PortRegistry};
+pub use process_env::{diagnose_proxy_env, get_devos_bin_dir, inject_proxy_bypass_env, ProxyDiagnosticInfo, DEFAULT_NO_PROXY};
+pub use project::{ProjectManager, DEVOS_MANAGED_LABEL};
 pub use watcher::{ProjectChangeEvent, ProjectWatcher};
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
-use devos_core::{DevosError, Result};
+use devos_core::{inject_proxy_bypass_env, DevosError, PortRegistry, Result};
 use crate::doctor::PreflightDoctor;
 use crate::driver::{DiagnosticItem, EnvDriver, EnvStatus, ExecResult};
 
@@ -22,20 +22,37 @@ impl EnvDriver for DdevDriver {
         let mut results = Vec::new();
         results.push(PreflightDoctor::check_docker());
         results.push(PreflightDoctor::check_ddev());
+        results.push(PreflightDoctor::check_proxy_bypass());
         Ok(results)
     }
 
     fn up(&self, project_root: &Path) -> Result<EnvStatus> {
-        let output = Command::new("ddev")
-            .arg("start")
-            .current_dir(project_root)
-            .output()
-            .map_err(|e| DevosError::EnvironmentError {
-                code: "DDEV_START_FAILED".to_string(),
-                message: format!("Failed to execute ddev start: {}", e),
-                hint: "Ensure Docker is running and DDEV is installed.".to_string(),
-                plain_message: "启动 Web 环境失败，请检查 Docker 是否正常运行。".to_string(),
-            })?;
+        // Automatically check if ports 80/443 are occupied by host processes (e.g. Nginx, IIS, phpStudy)
+        // If occupied, automatically configure fallback ports (e.g. 18080/18443) to prevent port collisions
+        let (http_port, https_port) = PortRegistry::find_free_web_ports(80, 443);
+        if http_port != 80 || https_port != 443 {
+            let mut cfg_cmd = Command::new("ddev");
+            cfg_cmd
+                .args([
+                    "config",
+                    &format!("--router-http-port={}", http_port),
+                    &format!("--router-https-port={}", https_port),
+                ])
+                .current_dir(project_root);
+            inject_proxy_bypass_env(&mut cfg_cmd);
+            let _ = cfg_cmd.output();
+        }
+
+        let mut start_cmd = Command::new("ddev");
+        start_cmd.arg("start").current_dir(project_root);
+        inject_proxy_bypass_env(&mut start_cmd);
+
+        let output = start_cmd.output().map_err(|e| DevosError::EnvironmentError {
+            code: "DDEV_START_FAILED".to_string(),
+            message: format!("Failed to execute ddev start: {}", e),
+            hint: "Ensure Docker is running and DDEV is installed.".to_string(),
+            plain_message: "启动 Web 环境失败，请检查 Docker 是否正常运行。".to_string(),
+        })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -51,19 +68,18 @@ impl EnvDriver for DdevDriver {
     }
 
     fn down(&self, project_root: &Path) -> Result<()> {
-        let _ = Command::new("ddev")
-            .arg("stop")
-            .current_dir(project_root)
-            .output();
+        let mut cmd = Command::new("ddev");
+        cmd.arg("stop").current_dir(project_root);
+        inject_proxy_bypass_env(&mut cmd);
+        let _ = cmd.output();
         Ok(())
     }
 
     fn status(&self, project_root: &Path) -> Result<EnvStatus> {
-        let output = Command::new("ddev")
-            .arg("describe")
-            .arg("-j")
-            .current_dir(project_root)
-            .output();
+        let mut cmd = Command::new("ddev");
+        cmd.arg("describe").arg("-j").current_dir(project_root);
+        inject_proxy_bypass_env(&mut cmd);
+        let output = cmd.output();
 
         match output {
             Ok(out) if out.status.success() => {
@@ -101,12 +117,14 @@ impl EnvDriver for DdevDriver {
         _env_vars: &[(&str, &str)],
     ) -> Result<ExecResult> {
         let start = Instant::now();
-        let output = Command::new("ddev")
+        let mut exec_cmd = Command::new("ddev");
+        exec_cmd
             .arg("exec")
             .arg(cmd)
-            .current_dir(project_root)
-            .output()
-            .map_err(|e| DevosError::Io(e))?;
+            .current_dir(project_root);
+        inject_proxy_bypass_env(&mut exec_cmd);
+
+        let output = exec_cmd.output().map_err(DevosError::Io)?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -121,13 +139,14 @@ impl EnvDriver for DdevDriver {
     }
 
     fn snapshot(&self, project_root: &Path, name: &str) -> Result<()> {
-        let output = Command::new("ddev")
-            .arg("snapshot")
+        let mut cmd = Command::new("ddev");
+        cmd.arg("snapshot")
             .arg("--name")
             .arg(name)
-            .current_dir(project_root)
-            .output()
-            .map_err(DevosError::Io)?;
+            .current_dir(project_root);
+        inject_proxy_bypass_env(&mut cmd);
+
+        let output = cmd.output().map_err(DevosError::Io)?;
 
         if !output.status.success() {
             return Err(DevosError::EnvironmentError {
@@ -141,13 +160,14 @@ impl EnvDriver for DdevDriver {
     }
 
     fn restore(&self, project_root: &Path, name: &str) -> Result<()> {
-        let output = Command::new("ddev")
-            .arg("snapshot")
+        let mut cmd = Command::new("ddev");
+        cmd.arg("snapshot")
             .arg("restore")
             .arg(name)
-            .current_dir(project_root)
-            .output()
-            .map_err(DevosError::Io)?;
+            .current_dir(project_root);
+        inject_proxy_bypass_env(&mut cmd);
+
+        let output = cmd.output().map_err(DevosError::Io)?;
 
         if !output.status.success() {
             return Err(DevosError::EnvironmentError {

@@ -7,9 +7,23 @@ use crate::db::Database;
 use crate::error::{DevosError, Result};
 use crate::fs_utils::{atomic_write, atomic_write_json, read_json};
 
+pub const DEVOS_MANAGED_LABEL: &str = "com.devos.managed=true";
+
 pub struct ProjectManager;
 
 impl ProjectManager {
+    /// Generate standardized container name: devos-<slug>-<4_char_hash>
+    pub fn get_container_name(slug: &str, project_id: &str) -> String {
+        let clean_slug = slug.to_lowercase().replace('_', "-");
+        let hash = if let Some(stripped) = project_id.strip_prefix("proj_") {
+            stripped.chars().take(4).collect::<String>()
+        } else {
+            project_id.chars().take(4).collect::<String>()
+        };
+        let short_hash = if hash.len() >= 4 { hash } else { "0001".to_string() };
+        format!("devos-{}-{}", clean_slug, short_hash)
+    }
+
     /// Load `devos.json` from the given directory (or search parent directories)
     pub fn find_and_load<P: AsRef<Path>>(start_path: P) -> Result<(PathBuf, DevosProject)> {
         let mut curr = start_path.as_ref().to_path_buf();

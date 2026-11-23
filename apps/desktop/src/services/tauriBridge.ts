@@ -132,6 +132,19 @@ export const Bridge = {
 
   applyAgentConfig: (agentId: string, projectPath?: string) =>
     invokeTauri<string>('apply_agent_config', { agentId, projectPath }),
+
+  inspectPortOccupant: (port: number) =>
+    invokeTauri<{
+      port: number;
+      is_occupied: boolean;
+      pid?: number;
+      process_name?: string;
+      command_line?: string;
+      suggested_action?: string;
+    }>('inspect_port_occupant', { port }),
+
+  reconfigureWebPorts: (projectPath: string, httpPort: number, httpsPort: number) =>
+    invokeTauri<string>('reconfigure_web_ports', { projectPath, httpPort, httpsPort }),
 };
 
 // Mock Fallbacks for Browser

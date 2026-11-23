@@ -8,6 +8,7 @@ import { AssetsView } from './components/AssetsView';
 import { NewProjectModal } from './components/NewProjectModal';
 import { PreflightDoctorModal } from './components/PreflightDoctorModal';
 import { CreateIssueModal } from './components/CreateIssueModal';
+import { ConflictDoctorModal } from './components/ConflictDoctorModal';
 import { BoardCard, BoardColumn, DevosProject, Issue, ProjectType, RecentProjectDto, RunManifest, ScriptContext } from './types';
 import { Bridge } from './services/tauriBridge';
 
@@ -23,6 +24,7 @@ export const App: React.FC = () => {
   // Modals state
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isDoctorOpen, setIsDoctorOpen] = useState(false);
+  const [isConflictDoctorOpen, setIsConflictDoctorOpen] = useState(false);
   const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
@@ -201,6 +203,7 @@ export const App: React.FC = () => {
         onSelectProjectByPath={(path) => loadProjectData(path)}
         onOpenNewProject={() => setIsNewProjectOpen(true)}
         onOpenDoctor={() => setIsDoctorOpen(true)}
+        onOpenConflictDoctor={() => setIsConflictDoctorOpen(true)}
       />
 
       {/* Main Container */}
@@ -265,6 +268,13 @@ export const App: React.FC = () => {
       <PreflightDoctorModal
         isOpen={isDoctorOpen}
         onClose={() => setIsDoctorOpen(false)}
+      />
+
+      <ConflictDoctorModal
+        isOpen={isConflictDoctorOpen}
+        onClose={() => setIsConflictDoctorOpen(false)}
+        projectPath={currentProjectPath}
+        onResolved={() => loadProjectData(currentProjectPath)}
       />
 
       <CreateIssueModal
