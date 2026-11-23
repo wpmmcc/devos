@@ -100,3 +100,30 @@ pub fn get_devos_bin_dir() -> PathBuf {
         .join(".devos")
         .join("bin")
 }
+
+/// Configure child process group so that entire process tree can be terminated on exit
+pub fn configure_child_process_group(cmd: &mut Command) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+}
+
+/// Terminate an entire child process tree by process group (avoiding zombie orphan processes)
+pub fn kill_process_tree(pid: u32) {
+    #[cfg(unix)]
+    {
+        // On Unix, send SIGKILL to the process group (-pid)
+        let pgid_arg = format!("-{}", pid);
+        let _ = Command::new("/bin/kill").args(["-9", &pgid_arg]).output();
+        // Also kill directly in case it wasn't process group leader
+        let pid_str = pid.to_string();
+        let _ = Command::new("/bin/kill").args(["-9", &pid_str]).output();
+    }
+    #[cfg(windows)]
+    {
+        let pid_str = pid.to_string();
+        let _ = Command::new("taskkill").args(["/F", "/T", "/PID", &pid_str]).output();
+    }
+}

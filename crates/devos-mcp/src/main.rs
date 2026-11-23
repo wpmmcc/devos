@@ -228,8 +228,31 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                 let include_standards = arguments["include_standards"].as_bool().unwrap_or(true);
                 let include_issues = arguments["include_open_issues"].as_bool().unwrap_or(true);
 
-                let cards = BoardManager::list_cards(&root, &project)?;
-                let issues = IssueManager::list_issues(&root, &project, Some("open"))?;
+                // Context pruning: only return active cards (todo, doing, testing)
+                let all_cards = BoardManager::list_cards(&root, &project)?;
+                let active_cards: Vec<_> = all_cards
+                    .into_iter()
+                    .filter(|c| !matches!(c.column, BoardColumn::Done))
+                    .collect();
+
+                let all_issues = IssueManager::list_issues(&root, &project, Some("open"))?;
+                // Prune open issues to at most 10 to protect token budget
+                let pruned_issues: Vec<_> = all_issues.into_iter().take(10).collect();
+
+                // Fetch top 5 knowledge titles
+                let knowledge_dir = root.join(&project.workspace_paths.knowledge);
+                let mut knowledge_titles = Vec::new();
+                if knowledge_dir.exists() {
+                    if let Ok(entries) = std::fs::read_dir(knowledge_dir) {
+                        for e in entries.flatten().take(5) {
+                            if let Ok(content) = std::fs::read_to_string(e.path()) {
+                                if let Some(first_line) = content.lines().next() {
+                                    knowledge_titles.push(first_line.trim_start_matches('#').trim().to_string());
+                                }
+                            }
+                        }
+                    }
+                }
 
                 let locale = std::env::var("DEVOS_LOCALE").unwrap_or_else(|_| "zh-CN".to_string());
                 let mut brief = json!({
@@ -240,9 +263,11 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                     "project_type": project.project_type,
                     "mode": project.mode,
                     "environments": project.environments,
-                    "board_cards_count": cards.len(),
-                    "open_issues_count": issues.len(),
+                    "active_board_cards": active_cards,
+                    "open_issues_count": pruned_issues.len(),
+                    "recent_knowledge_titles": knowledge_titles,
                     "user_locale": locale,
+                    "token_budget_pruned": true,
                     "agent_instructions": format!(
                         "请使用当前用户的语言 ({}) 编写白话总结、提测清单与问题排查说明。所有依赖安装与测试命令必须调用 env_control 在容器内执行。",
                         locale
@@ -263,7 +288,7 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
                 }
 
                 if include_issues {
-                    brief["open_issues"] = json!(issues);
+                    brief["open_issues_summary"] = json!(pruned_issues);
                 }
 
                 Ok(brief)

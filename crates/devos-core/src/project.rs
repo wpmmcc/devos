@@ -3,9 +3,11 @@ use std::fs;
 use devos_schema::{
     BoardCard, DevosProject, Issue, ProjectMode, ProjectType, RunManifest,
 };
+use crate::board::BoardManager;
 use crate::db::Database;
 use crate::error::{DevosError, Result};
 use crate::fs_utils::{atomic_write, atomic_write_json, read_json};
+use crate::issue::IssueManager;
 
 pub const DEVOS_MANAGED_LABEL: &str = "com.devos.managed=true";
 
@@ -61,9 +63,11 @@ impl ProjectManager {
             project_type.clone(),
         );
 
-        // 1. Write devos.json
+        // 1. Write devos.json and devos.json.bak
         let manifest_path = root.join("devos.json");
         atomic_write_json(&manifest_path, &project)?;
+        let backup_path = root.join("devos.json.bak");
+        let _ = atomic_write_json(&backup_path, &project);
 
         // 2. Create standard workspace directories
         fs::create_dir_all(root.join(&project.workspace_paths.requirements))?;
@@ -245,5 +249,81 @@ impl ProjectManager {
         }
 
         Ok(())
+    }
+
+    /// Check whether a proposed project directory has path pitfalls (Chinese, spaces, OneDrive/iCloud sync)
+    pub fn validate_project_workspace_path<P: AsRef<Path>>(path: P) -> Vec<String> {
+        let p = path.as_ref();
+        let path_str = p.to_string_lossy();
+        let mut warnings = Vec::new();
+
+        // 1. Check for cloud sync directories
+        let cloud_patterns = ["OneDrive", "iCloud", "BaiduNetdisk", "Dropbox", "Google Drive"];
+        for cp in cloud_patterns {
+            if path_str.contains(cp) {
+                warnings.push(format!(
+                    "路径位于云盘同步目录 ({}) 中。Docker 挂载和 SQLite 数据库在云盘中极易产生写锁冲突与挂载崩溃，强烈建议移至普通本地目录（如 ~/DevOS-Projects）。",
+                    cp
+                ));
+            }
+        }
+
+        // 2. Check for spaces
+        if path_str.contains(' ') {
+            warnings.push("路径包含空格，部分脚本工具链或 Docker 挂载可能解析异常，建议使用连字符 '-' 或下划线 '_'。".to_string());
+        }
+
+        // 3. Check for non-ASCII (e.g. Chinese characters)
+        if !path_str.is_ascii() {
+            warnings.push("路径包含中文字符，非英语字符可能导致部分 CLI 工具和旧版 Docker 解析乱码。".to_string());
+        }
+
+        // 4. Check for length (> 200)
+        if path_str.len() > 200 {
+            warnings.push("路径层级过深（长度超过 200 字符），可能在 Windows 环境下触发 MAX_PATH 限制。".to_string());
+        }
+
+        warnings
+    }
+
+    /// Create a zero-wait interactive demo project for first-time onboarding
+    pub fn init_demo_project<P: AsRef<Path>>(target_dir: P, db: Option<&Database>) -> Result<DevosProject> {
+        let root = target_dir.as_ref();
+        let project = Self::init_project(
+            root,
+            "demo-quickstart",
+            "演示项目：极简发票工具",
+            "这是一个无需拉取重型 Docker 镜像的 1 分钟新手交互演示项目。",
+            ProjectType::Script,
+            db,
+        )?;
+
+        // Seed a demo card
+        let _ = BoardManager::upsert_card(
+            root,
+            &project,
+            Some("CARD-001".to_string()),
+            Some("体验 1 分钟完成功能验收与提测".to_string()),
+            devos_schema::BoardColumn::Doing,
+            "system",
+            None,
+            Some("点击测试台运行脚本并进行打勾验收。".to_string()),
+        );
+
+        // Seed a demo issue
+        let _ = IssueManager::create_issue(
+            root,
+            &project,
+            "金额汇总小数位精度偏离",
+            "测试时发现当金额存在分位时未做四舍五入",
+            Some("保留 2 位小数".to_string()),
+            devos_schema::IssueSeverity::Medium,
+            devos_schema::SourceType::ScriptRun,
+            devos_schema::CapturedContext::default(),
+            Some("CARD-001".to_string()),
+            Some(1),
+        );
+
+        Ok(project)
     }
 }

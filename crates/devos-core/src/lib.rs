@@ -14,6 +14,7 @@ pub mod port;
 pub mod process_env;
 pub mod project;
 pub mod release;
+pub mod storage_cleaner;
 pub mod watcher;
 
 pub use agent_config::{AgentConfigManager, AgentDetection};
@@ -29,9 +30,10 @@ pub use issue::IssueManager;
 pub use logging::{export_diagnostic_bundle, get_runtime_logs, log_runtime_line, sanitize_text, DiagnosticBundle};
 pub use mirror::{DownloadProgress, MirrorManager, MirrorPreset, MirrorRaceResult, MirrorsConfig};
 pub use port::{PortAllocation, PortOccupant, PortRegistry};
-pub use process_env::{diagnose_proxy_env, get_devos_bin_dir, inject_proxy_bypass_env, ProxyDiagnosticInfo, DEFAULT_NO_PROXY};
+pub use process_env::{configure_child_process_group, diagnose_proxy_env, get_devos_bin_dir, inject_proxy_bypass_env, kill_process_tree, ProxyDiagnosticInfo, DEFAULT_NO_PROXY};
 pub use project::{ProjectManager, DEVOS_MANAGED_LABEL};
 pub use release::{PreflightGateResult, ReleaseBuildResult, ReleaseHealthCheck, ReleaseManager, ReleaseManifest};
+pub use storage_cleaner::{StorageCleaner, StorageReport};
 pub use watcher::{ProjectChangeEvent, ProjectWatcher};
 
 #[cfg(test)]
@@ -186,5 +188,45 @@ mod tests {
         config.insert("port".to_string(), "22".to_string());
         let val = DeployPluginManager::validate_target("vps-docker", &config).unwrap();
         assert!(val.connected);
+
+        // 11. Test Path Validator & Demo Project (Phase 10)
+        let warnings = ProjectManager::validate_project_workspace_path(std::path::Path::new("C:\\Users\\张三\\OneDrive\\我的项目"));
+        assert!(!warnings.is_empty());
+        assert!(warnings.iter().any(|w| w.contains("OneDrive")));
+        assert!(warnings.iter().any(|w| w.contains("中文")));
+
+        let demo_dir = dir.path().join("demo-app");
+        let demo_proj = ProjectManager::init_demo_project(&demo_dir, Some(&db)).unwrap();
+        assert_eq!(demo_proj.slug, "demo-quickstart");
+        assert!(demo_dir.join("devos.json.bak").exists());
+
+        // 12. Test Storage Cleaner (Phase 10)
+        let storage = StorageCleaner::calculate_storage_usage(&project_dir);
+        assert_eq!(storage.low_disk_warning, false);
+
+        // 13. Test Daemon Request Security (CSRF / DNS Rebinding) (Phase 10)
+        let csrf_err = DaemonManager::validate_request_security(
+            Some("127.0.0.1:18080"),
+            Some("http://malicious-site.com"),
+            Some("Bearer my_token"),
+            "my_token",
+        );
+        assert!(csrf_err.is_err());
+
+        let dns_err = DaemonManager::validate_request_security(
+            Some("attacker.com:18080"),
+            None,
+            Some("Bearer my_token"),
+            "my_token",
+        );
+        assert!(dns_err.is_err());
+
+        let valid_req = DaemonManager::validate_request_security(
+            Some("127.0.0.1:18080"),
+            Some("http://127.0.0.1:18080"),
+            Some("Bearer my_token"),
+            "my_token",
+        );
+        assert!(valid_req.is_ok());
     }
 }
