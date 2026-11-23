@@ -49,7 +49,14 @@ def assert_eq(actual, expected, msg=""):
     assert actual == expected, f"{msg} (Expected {expected}, got {actual})"
 
 def run_cmd(cmd, cwd=REPO_ROOT, check=True):
-    res = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True)
+    res = subprocess.run(
+        cmd,
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace"
+    )
     if check and res.returncode != 0:
         print(f"Command failed: {' '.join(cmd)}")
         print("STDOUT:", res.stdout)
@@ -92,7 +99,7 @@ def test_2_project_scaffolding(proj_dir: Path):
     assert (proj_dir / "board").is_dir(), "board/ must exist"
     assert (proj_dir / "issues").is_dir(), "issues/ must exist"
 
-    with open(proj_dir / "devos.json") as f:
+    with open(proj_dir / "devos.json", encoding="utf-8") as f:
         meta = json.load(f)
     assert meta["slug"] == "e2e-invoice-app"
     print(f"   ✓ Workspace initialized successfully via CLI with all protocols at {proj_dir}")
@@ -106,6 +113,8 @@ def test_3_mcp_10_tools_and_session_jail(proj_dir: Path):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="replace"
     )
 
     def rpc(msg):
@@ -280,15 +289,15 @@ def test_4_universal_bundle_exporter(proj_dir: Path):
             "compose_valid": True
         }
     }
-    with open(manifest_file, "w") as f:
+    with open(manifest_file, "w", encoding="utf-8") as f:
         json.dump(manifest_data, f, indent=2)
 
     deploy_doc = releases_dir / "DEPLOY.md"
-    deploy_doc.write_text("# 生产部署指南\n\n1. 复制 .env.prod.example 为 .env.prod\n2. 执行 docker compose up -d\n")
+    deploy_doc.write_text("# 生产部署指南\n\n1. 复制 .env.prod.example 为 .env.prod\n2. 执行 docker compose up -d\n", encoding="utf-8")
 
     deploy_dir = releases_dir / "deploy"
     deploy_dir.mkdir(exist_ok=True)
-    (deploy_dir / "docker-compose.prod.yml").write_text("version: '3.8'\nservices:\n  app:\n    image: nginx:alpine\n")
+    (deploy_dir / "docker-compose.prod.yml").write_text("version: '3.8'\nservices:\n  app:\n    image: nginx:alpine\n", encoding="utf-8")
 
     # Create zip archive
     zip_path = proj_dir / "releases" / "e2e-invoice-app-v1.0.0.zip"
