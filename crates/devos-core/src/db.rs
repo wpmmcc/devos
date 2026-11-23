@@ -90,6 +90,13 @@ impl Database {
                 FOREIGN KEY (project_id) REFERENCES projects(project_id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS recent_projects (
+                path TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                project_type TEXT NOT NULL,
+                last_opened_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_board_proj ON board_cards(project_id, col);
             CREATE INDEX IF NOT EXISTS idx_issues_proj ON issues(project_id, status);
             CREATE INDEX IF NOT EXISTS idx_assets_proj ON assets(project_id, asset_type);
@@ -187,5 +194,51 @@ impl Database {
             params![issue_id, project_id, status, severity, source_type, title, data_json, created_at, now],
         )?;
         Ok(())
+    }
+
+    pub fn add_recent_project(&self, path: &str, name: &str, project_type: &str) -> Result<()> {
+        let now = chrono::Utc::now().to_rfc3339();
+        self.conn.execute(
+            r#"
+            INSERT INTO recent_projects (path, name, project_type, last_opened_at)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(path) DO UPDATE SET
+                name = excluded.name,
+                project_type = excluded.project_type,
+                last_opened_at = excluded.last_opened_at
+            "#,
+            params![path, name, project_type, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_recent_projects(&self) -> Result<Vec<(String, String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT path, name, project_type FROM recent_projects ORDER BY last_opened_at DESC LIMIT 10"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })?;
+
+        let mut res = Vec::new();
+        for r in rows {
+            if let Ok(item) = r {
+                res.push(item);
+            }
+        }
+        Ok(res)
+    }
+
+    pub fn get_last_active_project(&self) -> Result<Option<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT path FROM recent_projects ORDER BY last_opened_at DESC LIMIT 1"
+        )?;
+        let mut rows = stmt.query([])?;
+        if let Some(row) = rows.next()? {
+            let path: String = row.get(0)?;
+            Ok(Some(path))
+        } else {
+            Ok(None)
+        }
     }
 }

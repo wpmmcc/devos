@@ -80,9 +80,13 @@ enum Commands {
 
     /// Standardized issue feedback and closing loop
     Issue {
-        action: String, // list, get, resolve, retest
+        action: String, // list, get, create, resolve, retest
         #[arg(long)]
         issue_id: Option<String>,
+        #[arg(long)]
+        title: Option<String>,
+        #[arg(long)]
+        description: Option<String>,
         #[arg(long)]
         status: Option<String>,
         #[arg(long)]
@@ -395,6 +399,8 @@ async fn main() {
         Commands::Issue {
             action,
             issue_id,
+            title,
+            description,
             status,
             summary,
             files,
@@ -416,6 +422,23 @@ async fn main() {
                             plain_message: Some("请指定反馈编号 --issue-id".to_string()),
                         })?;
                         let issue = IssueManager::get_issue(&root, &project, &id)?;
+                        Ok(serde_json::to_value(issue)?)
+                    }
+                    "create" => {
+                        let t = title.unwrap_or_else(|| "用户反馈测试问题".to_string());
+                        let desc = description.unwrap_or_else(|| "无详细描述".to_string());
+                        let issue = IssueManager::create_issue(
+                            &root,
+                            &project,
+                            &t,
+                            &desc,
+                            None,
+                            devos_schema::IssueSeverity::High,
+                            devos_schema::SourceType::Manual,
+                            devos_schema::CapturedContext::default(),
+                            None,
+                            None,
+                        )?;
                         Ok(serde_json::to_value(issue)?)
                     }
                     "resolve" => {

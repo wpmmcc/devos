@@ -8,11 +8,13 @@ import { AssetsView } from './components/AssetsView';
 import { NewProjectModal } from './components/NewProjectModal';
 import { PreflightDoctorModal } from './components/PreflightDoctorModal';
 import { CreateIssueModal } from './components/CreateIssueModal';
-import { BoardCard, BoardColumn, DevosProject, Issue, ProjectType, RunManifest, ScriptContext } from './types';
+import { BoardCard, BoardColumn, DevosProject, Issue, ProjectType, RecentProjectDto, RunManifest, ScriptContext } from './types';
 import { Bridge } from './services/tauriBridge';
 
 export const App: React.FC = () => {
+  const [currentProjectPath, setCurrentProjectPath] = useState<string>('.');
   const [project, setProject] = useState<DevosProject | null>(null);
+  const [recentProjects, setRecentProjects] = useState<RecentProjectDto[]>([]);
   const [activeTab, setActiveTab] = useState<'board' | 'test' | 'issues' | 'assets'>('board');
   const [cards, setCards] = useState<BoardCard[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -24,32 +26,40 @@ export const App: React.FC = () => {
   const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
-  // Load initial demo project or project from path
+  const loadRecentProjects = async () => {
+    const res = await Bridge.getRecentProjects();
+    if (res.ok && res.data) {
+      setRecentProjects(res.data);
+    }
+  };
+
   const loadProjectData = async (projPath: string) => {
+    setCurrentProjectPath(projPath);
     const res = await Bridge.loadProject(projPath);
     if (res.ok && res.data) {
       setProject(res.data);
       refreshCards(projPath);
       refreshIssues(projPath);
       refreshManifest(projPath);
+      loadRecentProjects();
     }
   };
 
-  const refreshCards = async (projPath: string) => {
+  const refreshCards = async (projPath = currentProjectPath) => {
     const res = await Bridge.listCards(projPath);
     if (res.ok && res.data) {
       setCards(res.data);
     }
   };
 
-  const refreshIssues = async (projPath: string) => {
+  const refreshIssues = async (projPath = currentProjectPath) => {
     const res = await Bridge.listIssues(projPath);
     if (res.ok && res.data) {
       setIssues(res.data);
     }
   };
 
-  const refreshManifest = async (projPath: string) => {
+  const refreshManifest = async (projPath = currentProjectPath) => {
     const res = await Bridge.getRunManifest(projPath);
     if (res.ok && res.data) {
       setManifest(res.data);
@@ -57,8 +67,40 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Load default project on start
-    loadProjectData('.');
+    // 1. Initial load
+    loadRecentProjects().then(() => {
+      loadProjectData('.');
+    });
+
+    // 2. Setup real-time event listeners from Tauri Core
+    let unlistenBoard: any;
+    let unlistenIssues: any;
+    let unlistenProject: any;
+
+    Bridge.listenToEvent('devos://board-updated', () => {
+      refreshCards();
+    }).then((unlisten) => {
+      unlistenBoard = unlisten;
+    });
+
+    Bridge.listenToEvent('devos://issues-updated', () => {
+      refreshIssues();
+      refreshCards();
+    }).then((unlisten) => {
+      unlistenIssues = unlisten;
+    });
+
+    Bridge.listenToEvent('devos://project-updated', () => {
+      loadProjectData(currentProjectPath);
+    }).then((unlisten) => {
+      unlistenProject = unlisten;
+    });
+
+    return () => {
+      if (typeof unlistenBoard === 'function') unlistenBoard();
+      if (typeof unlistenIssues === 'function') unlistenIssues();
+      if (typeof unlistenProject === 'function') unlistenProject();
+    };
   }, []);
 
   const handleCreateProject = async (
@@ -73,14 +115,15 @@ export const App: React.FC = () => {
       refreshCards('.');
       refreshIssues('.');
       refreshManifest('.');
+      loadRecentProjects();
     }
   };
 
   const handleMoveCard = async (cardId: string, col: BoardColumn) => {
     if (!project) return;
-    const res = await Bridge.moveCard('.', cardId, col, 'user');
+    const res = await Bridge.moveCard(currentProjectPath, cardId, col, 'user');
     if (res.ok) {
-      refreshCards('.');
+      refreshCards();
     } else if (res.error) {
       alert(`无法流转卡片: ${res.error.plain_message || res.error.message}`);
     }
@@ -88,10 +131,10 @@ export const App: React.FC = () => {
 
   const handleRetestIssue = async (issueId: string, passed: boolean, feedback: string) => {
     if (!project) return;
-    const res = await Bridge.retestIssue('.', issueId, passed, feedback);
+    const res = await Bridge.retestIssue(currentProjectPath, issueId, passed, feedback);
     if (res.ok) {
-      refreshIssues('.');
-      refreshCards('.');
+      refreshIssues();
+      refreshCards();
     }
   };
 
@@ -100,7 +143,7 @@ export const App: React.FC = () => {
     inputs: Record<string, any>
   ): Promise<ScriptContext | null> => {
     if (!project) return null;
-    const res = await Bridge.executeScript('.', targetId, inputs);
+    const res = await Bridge.executeScript(currentProjectPath, targetId, inputs);
     return res.ok && res.data ? res.data : null;
   };
 
@@ -112,7 +155,7 @@ export const App: React.FC = () => {
   ) => {
     if (!project) return;
     const res = await Bridge.createWebIssue(
-      '.',
+      currentProjectPath,
       title,
       description,
       data?.url || 'https://invoice-helper.ddev.site',
@@ -121,7 +164,7 @@ export const App: React.FC = () => {
       []
     );
     if (res.ok) {
-      refreshIssues('.');
+      refreshIssues();
       setActiveTab('issues');
     }
   };
@@ -136,7 +179,8 @@ export const App: React.FC = () => {
       {/* 220px Sidebar */}
       <Sidebar
         currentProject={project}
-        onSelectProject={(p) => setProject(p)}
+        recentProjects={recentProjects}
+        onSelectProjectByPath={(path) => loadProjectData(path)}
         onOpenNewProject={() => setIsNewProjectOpen(true)}
         onOpenDoctor={() => setIsDoctorOpen(true)}
       />

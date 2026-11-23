@@ -1,15 +1,28 @@
 use devos_core::{
-    fs_utils::read_json, BoardManager, Database, DevosError, IssueManager, ProjectManager, Result,
+    fs_utils::read_json, BoardManager, Database, DevosError, IssueManager, ProjectChangeEvent,
+    ProjectManager, ProjectWatcher, Result,
 };
 use devos_env::{
     DdevDriver, DevcontainerDriver, DiagnosticItem, EnvDriver, EnvStatus, PreflightDoctor,
 };
 use devos_schema::{
-    ApiResponse, BoardCard, BoardColumn, DevosProject, Issue, IssueSeverity,
-    ProjectType, RunManifest, SourceType,
+    ApiResponse, BoardCard, BoardColumn, DevosProject, Issue, IssueSeverity, ProjectType,
+    RunManifest, SourceType,
 };
-use std::path::Path;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::Instant;
+use tauri::{AppHandle, Emitter, State};
+
+struct ActiveWatcherState(Mutex<Option<ProjectWatcher>>);
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RecentProjectDto {
+    pub path: String,
+    pub name: String,
+    pub project_type: String,
+}
 
 fn to_api_resp<T>(res: Result<T>) -> ApiResponse<T> {
     match res {
@@ -30,7 +43,26 @@ fn run_preflight_doctor() -> ApiResponse<Vec<DiagnosticItem>> {
 }
 
 #[tauri::command]
+fn get_recent_projects() -> ApiResponse<Vec<RecentProjectDto>> {
+    let res = (|| -> Result<Vec<RecentProjectDto>> {
+        let db = Database::open_global()?;
+        let list = db.list_recent_projects()?;
+        Ok(list
+            .into_iter()
+            .map(|(path, name, project_type)| RecentProjectDto {
+                path,
+                name,
+                project_type,
+            })
+            .collect())
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
 fn init_project(
+    app: AppHandle,
+    state: State<'_, ActiveWatcherState>,
     target_path: String,
     slug: String,
     name: String,
@@ -42,28 +74,108 @@ fn init_project(
         "script" => ProjectType::Script,
         _ => ProjectType::Hybrid,
     };
+
+    let resolved_path = if target_path.is_empty() || target_path == "." {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        home.join("devos-projects").join(&slug)
+    } else {
+        let p = PathBuf::from(&target_path);
+        if p.file_name().and_then(|s| s.to_str()) == Some(&slug) {
+            p
+        } else {
+            p.join(&slug)
+        }
+    };
+
     let db = Database::open_global().ok();
     let res = ProjectManager::init_project(
-        &target_path,
+        &resolved_path,
         &slug,
         &name,
         &description,
         p_type,
         db.as_ref(),
     );
+
+    if let Ok(ref proj) = res {
+        if let Some(ref database) = db {
+            let _ = database.add_recent_project(
+                &resolved_path.display().to_string(),
+                &proj.name,
+                match proj.project_type {
+                    ProjectType::Web => "web",
+                    ProjectType::Script => "script",
+                    ProjectType::Hybrid => "hybrid",
+                },
+            );
+        }
+
+        // Setup real-time file watcher
+        setup_watcher(&app, &state, &resolved_path);
+    }
+
     to_api_resp(res)
 }
 
 #[tauri::command]
-fn load_project(project_path: String) -> ApiResponse<DevosProject> {
+fn load_project(
+    app: AppHandle,
+    state: State<'_, ActiveWatcherState>,
+    project_path: String,
+) -> ApiResponse<DevosProject> {
     let res = (|| -> Result<DevosProject> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
         if let Ok(db) = Database::open_global() {
             let _ = ProjectManager::sync_to_db(&root, &project, &db);
+            let _ = db.add_recent_project(
+                &root.display().to_string(),
+                &project.name,
+                match project.project_type {
+                    ProjectType::Web => "web",
+                    ProjectType::Script => "script",
+                    ProjectType::Hybrid => "hybrid",
+                },
+            );
         }
+
+        // Setup real-time file watcher
+        setup_watcher(&app, &state, &root);
+
         Ok(project)
     })();
     to_api_resp(res)
+}
+
+fn setup_watcher(app: &AppHandle, state: &State<'_, ActiveWatcherState>, root: &Path) {
+    let app_handle = app.clone();
+    let root_buf = root.to_path_buf();
+
+    let watcher_res = ProjectWatcher::watch(root, move |event, _path| {
+        // Automatically sync to sqlite and broadcast Tauri event
+        if let Ok(db) = Database::open_global() {
+            if let Ok((r, p)) = ProjectManager::find_and_load(&root_buf) {
+                let _ = ProjectManager::sync_to_db(&r, &p, &db);
+            }
+        }
+
+        match event {
+            ProjectChangeEvent::BoardUpdated { card_id } => {
+                let _ = app_handle.emit("devos://board-updated", card_id);
+            }
+            ProjectChangeEvent::IssueUpdated { issue_id } => {
+                let _ = app_handle.emit("devos://issues-updated", issue_id);
+            }
+            ProjectChangeEvent::ManifestUpdated | ProjectChangeEvent::StandardUpdated => {
+                let _ = app_handle.emit("devos://project-updated", ());
+            }
+            _ => {}
+        }
+    });
+
+    if let Ok(w) = watcher_res {
+        let mut lock = state.0.lock().unwrap();
+        *lock = Some(w);
+    }
 }
 
 #[tauri::command]
@@ -77,6 +189,7 @@ fn list_board_cards(project_path: String) -> ApiResponse<Vec<BoardCard>> {
 
 #[tauri::command]
 fn move_board_card(
+    app: AppHandle,
     project_path: String,
     card_id: String,
     column: String,
@@ -90,7 +203,7 @@ fn move_board_card(
             "done" => BoardColumn::Done,
             _ => BoardColumn::Todo,
         };
-        BoardManager::upsert_card(
+        let card = BoardManager::upsert_card(
             &root,
             &project,
             Some(card_id),
@@ -99,7 +212,9 @@ fn move_board_card(
             &updated_by,
             None,
             None,
-        )
+        )?;
+        let _ = app.emit("devos://board-updated", &card.card_id);
+        Ok(card)
     })();
     to_api_resp(res)
 }
@@ -115,6 +230,7 @@ fn list_issues(project_path: String, status: Option<String>) -> ApiResponse<Vec<
 
 #[tauri::command]
 fn create_web_issue(
+    app: AppHandle,
     project_path: String,
     title: String,
     description: String,
@@ -137,7 +253,7 @@ fn create_web_issue(
             backend_logs_tail: vec![],
         });
 
-        IssueManager::create_issue(
+        let issue = IssueManager::create_issue(
             &root,
             &project,
             &title,
@@ -148,13 +264,16 @@ fn create_web_issue(
             context,
             None,
             None,
-        )
+        )?;
+        let _ = app.emit("devos://issues-updated", &issue.issue_id);
+        Ok(issue)
     })();
     to_api_resp(res)
 }
 
 #[tauri::command]
 fn retest_issue(
+    app: AppHandle,
     project_path: String,
     issue_id: String,
     passed: bool,
@@ -162,7 +281,9 @@ fn retest_issue(
 ) -> ApiResponse<Issue> {
     let res = (|| -> Result<Issue> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
-        IssueManager::retest_issue(&root, &project, &issue_id, passed, &feedback)
+        let issue = IssueManager::retest_issue(&root, &project, &issue_id, passed, &feedback)?;
+        let _ = app.emit("devos://issues-updated", &issue.issue_id);
+        Ok(issue)
     })();
     to_api_resp(res)
 }
@@ -201,7 +322,6 @@ fn execute_script_target(
                 plain_message: Some(format!("未在 devos.run.json 中找到任务 {}", target_id)),
             })?;
 
-        // Render command placeholders {{key}}
         let mut cmd = target.command.clone();
         if let Some(map) = inputs.as_object() {
             for (k, v) in map {
@@ -276,8 +396,10 @@ fn stop_environment(project_path: String, target: String) -> ApiResponse<bool> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(ActiveWatcherState(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             run_preflight_doctor,
+            get_recent_projects,
             init_project,
             load_project,
             list_board_cards,

@@ -33,6 +33,20 @@ async function invokeTauri<T>(cmd: string, args: Record<string, any> = {}): Prom
 export const Bridge = {
   runDoctor: () => invokeTauri<DiagnosticItem[]>('run_preflight_doctor'),
 
+  getRecentProjects: () => invokeTauri<Array<{ path: string; name: string; project_type: string }>>('get_recent_projects'),
+
+  listenToEvent: async (eventName: string, handler: (payload: any) => void) => {
+    if (isTauri()) {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        return await listen(eventName, (event) => handler(event.payload));
+      } catch (err) {
+        console.error('Failed to listen to event:', err);
+      }
+    }
+    return () => {};
+  },
+
   initProject: (targetPath: string, slug: string, name: string, description: string, projectType: string) =>
     invokeTauri<DevosProject>('init_project', {
       targetPath,
@@ -102,6 +116,15 @@ function mockHandler<T>(cmd: string, args: Record<string, any>): ApiResponse<T> 
         { key: 'docker', title: 'Docker 容器引擎', status: 'ok', message: 'Docker Desktop / OrbStack 运行中' },
         { key: 'ddev', title: 'DDEV 网页与数据库环境', status: 'ok', message: '已安装 v1.25.5' },
         { key: 'devcontainer', title: 'Dev Container 脚本环境', status: 'warning', message: '未检测到 @devcontainers/cli 命令', fix_hint: '可在终端执行 npm i -g @devcontainers/cli' },
+      ] as any,
+    };
+  }
+
+  if (cmd === 'get_recent_projects') {
+    return {
+      ok: true,
+      data: [
+        { path: '.', name: '发票自动整理与查看系统', project_type: 'hybrid' },
       ] as any,
     };
   }

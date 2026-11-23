@@ -180,6 +180,12 @@ export interface RunManifest {
   targets: RunTarget[];
 }
 
+export interface RecentProjectDto {
+  path: string;
+  name: string;
+  project_type: string;
+}
+
 export interface DiagnosticItem {
   key: string;
   title: string;

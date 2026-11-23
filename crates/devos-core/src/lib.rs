@@ -6,6 +6,7 @@ pub mod fs_utils;
 pub mod issue;
 pub mod port;
 pub mod project;
+pub mod watcher;
 
 pub use board::BoardManager;
 pub use daemon::DaemonManager;
@@ -15,6 +16,7 @@ pub use fs_utils::{atomic_write, atomic_write_json, ensure_within_root, read_jso
 pub use issue::IssueManager;
 pub use port::PortRegistry;
 pub use project::ProjectManager;
+pub use watcher::{ProjectChangeEvent, ProjectWatcher};
 
 #[cfg(test)]
 mod tests {
