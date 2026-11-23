@@ -1,6 +1,7 @@
 pub mod agent_config;
 pub mod board;
 pub mod checkpoint;
+pub mod command_bus;
 pub mod daemon;
 pub mod db;
 pub mod deploy_plugin;
@@ -20,6 +21,7 @@ pub mod watcher;
 pub use agent_config::{AgentConfigManager, AgentDetection};
 pub use board::BoardManager;
 pub use checkpoint::{Checkpoint, CheckpointManager};
+pub use command_bus::CommandBus;
 pub use daemon::DaemonManager;
 pub use db::{ActivityEvent, Database};
 pub use deploy_plugin::{DeployPlan, DeployPluginManager, DeployPluginMetadata, DeployProgressEvent, DeployResult, ValidationResult};

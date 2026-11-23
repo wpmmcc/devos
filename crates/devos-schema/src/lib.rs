@@ -2,6 +2,7 @@ pub mod agent;
 pub mod board;
 pub mod daemon;
 pub mod decision;
+pub mod envelope;
 pub mod issue;
 pub mod project;
 pub mod response;
@@ -11,6 +12,7 @@ pub use agent::AgentDetection;
 pub use board::{BoardCard, BoardColumn, ChecklistStep};
 pub use daemon::DaemonInfo;
 pub use decision::{DecisionOption, DecisionRequest};
+pub use envelope::{CallerType, CommandEnvelope, CommandErrorDetail, CommandMeta, PermissionLevel};
 pub use issue::{
     AnnotatedRegion, CapturedContext, ConsoleErrorRecord, FailedRequestRecord, Issue, IssueClaim,
     IssueResolution, IssueSeverity, IssueStatus, RetestRecord, ScriptContext, SourceType,
