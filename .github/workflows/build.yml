@@ -38,6 +38,45 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Setup DevContainer CLI
+        run: npm install -g @devcontainers/cli
+
+      - name: Add Windows npm bin to PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $npmPrefix = npm config get prefix
+          "$npmPrefix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Setup DDEV (Ubuntu)
+        if: runner.os == 'Linux'
+        uses: ddev/github-action-setup-ddev@v1
+        with:
+          autostart: false
+
+      - name: Setup DDEV (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          curl -fsSL "https://github.com/ddev/ddev/releases/latest/download/ddev_macos-arm64.tar.gz" | sudo tar -xz -C /usr/local/bin ddev
+          sudo chmod +x /usr/local/bin/ddev
+
+      - name: Setup DDEV (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\tools\ddev
+          Invoke-WebRequest -Uri "https://github.com/ddev/ddev/releases/latest/download/ddev_windows-amd64.zip" -OutFile C:\tools\ddev\ddev.zip
+          Expand-Archive -Path C:\tools\ddev\ddev.zip -DestinationPath C:\tools\ddev -Force
+          "C:\tools\ddev" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Verify Framework Engines Execution
+        shell: bash
+        run: |
+          echo "=== DDEV Framework Version ==="
+          ddev --version || ddev version
+          echo "=== DevContainer Framework Version ==="
+          devcontainer --version
+
       - name: Run Cargo Check
         run: cargo check --workspace
 

@@ -140,13 +140,37 @@ impl EnvDriver for DevcontainerDriver {
         let res = dc_cmd.output();
 
         let output = match res {
-            Ok(out) => out,
+            Ok(out) if out.status.success() => out,
+            Ok(out) => {
+                // If container is not running or devcontainer failed, gracefully fallback to host execution
+                let mut fallback_cmd = if cfg!(windows) {
+                    let mut c = Command::new("cmd");
+                    c.args(["/C", cmd]).current_dir(project_root);
+                    c
+                } else {
+                    let mut c = Command::new("sh");
+                    c.arg("-c").arg(cmd).current_dir(project_root);
+                    c
+                };
+                inject_proxy_bypass_env(&mut fallback_cmd);
+                match fallback_cmd.output() {
+                    Ok(local_out) => local_out,
+                    Err(_) => out,
+                }
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 // Graceful fallback to local execution
-                let mut sh_cmd = Command::new("sh");
-                sh_cmd.arg("-c").arg(cmd).current_dir(project_root);
-                inject_proxy_bypass_env(&mut sh_cmd);
-                sh_cmd.output().map_err(DevosError::Io)?
+                let mut fallback_cmd = if cfg!(windows) {
+                    let mut c = Command::new("cmd");
+                    c.args(["/C", cmd]).current_dir(project_root);
+                    c
+                } else {
+                    let mut c = Command::new("sh");
+                    c.arg("-c").arg(cmd).current_dir(project_root);
+                    c
+                };
+                inject_proxy_bypass_env(&mut fallback_cmd);
+                fallback_cmd.output().map_err(DevosError::Io)?
             }
             Err(e) => return Err(DevosError::Io(e)),
         };

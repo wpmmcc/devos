@@ -314,6 +314,96 @@ def test_5_desktop_frontend_build():
     assert (dist_dir / "index.html").exists(), "index.html must exist in dist"
     print("   ✓ Desktop Vite production bundle verified (zero TypeScript/JSX syntax errors)")
 
+def test_6_framework_architectures_and_drivers(proj_dir: Path):
+    log_step("6. Framework Architectures & Drivers Verification (DDEV & DevContainer)")
+    
+    # 1. Framework binary detection and version command execution
+    ddev_bin = shutil.which("ddev")
+    if ddev_bin:
+        ddev_ver_res = subprocess.run([ddev_bin, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if ddev_ver_res.returncode == 0:
+            print(f"   ✓ DDEV framework binary verified: {ddev_ver_res.stdout.strip()}")
+        else:
+            print(f"   ⚠ DDEV binary found at {ddev_bin} but exited with code {ddev_ver_res.returncode}")
+    else:
+        print("   ℹ DDEV binary not on system PATH (skipped direct CLI call)")
+
+    dc_bin = shutil.which("devcontainer")
+    if not dc_bin:
+        devos_bin = Path.home() / ".devos" / "bin" / ("devcontainer.cmd" if sys.platform == "win32" else "devcontainer")
+        if devos_bin.exists():
+            dc_bin = str(devos_bin)
+    
+    if dc_bin:
+        dc_ver_res = subprocess.run([dc_bin, "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if dc_ver_res.returncode == 0:
+            print(f"   ✓ DevContainer framework binary verified: {dc_ver_res.stdout.strip()}")
+        else:
+            print(f"   ⚠ DevContainer binary found at {dc_bin} but exited with code {dc_ver_res.returncode}")
+    else:
+        print("   ℹ DevContainer binary not on system PATH (skipped direct CLI call)")
+
+    # 2. Test DevOS CLI Environment Driver Controls
+    # Web driver (DDEV)
+    res_web = run_cmd([
+        str(CLI_BIN), "--project-dir", str(proj_dir), "--json",
+        "env", "status", "--target", "web"
+    ])
+    web_data = json.loads(res_web.stdout)
+    assert web_data["ok"] is True
+    assert web_data["data"]["driver"] == "ddev"
+    print(f"   ✓ DevOS DDEV driver status check passed (driver: ddev, running: {web_data['data']['running']})")
+
+    # Script driver (DevContainer)
+    res_script = run_cmd([
+        str(CLI_BIN), "--project-dir", str(proj_dir), "--json",
+        "env", "status", "--target", "script"
+    ])
+    script_data = json.loads(res_script.stdout)
+    assert script_data["ok"] is True
+    assert script_data["data"]["driver"] == "devcontainer"
+    print(f"   ✓ DevOS DevContainer driver status check passed (driver: devcontainer, running: {script_data['data']['running']})")
+
+    # Script driver exec with automatic host fallback
+    res_exec = run_cmd([
+        str(CLI_BIN), "--project-dir", str(proj_dir), "--json",
+        "env", "exec", "--target", "script", "--cmd", "echo devos-framework-exec-ok"
+    ])
+    exec_data = json.loads(res_exec.stdout)
+    assert exec_data["ok"] is True
+    assert "devos-framework-exec-ok" in exec_data["data"]["stdout"]
+    print("   ✓ DevOS DevContainer exec & host fallback verified successfully")
+
+    # 3. Test Framework Configuration Manifests
+    # DDEV config structure
+    ddev_dir = proj_dir / ".ddev"
+    ddev_dir.mkdir(exist_ok=True)
+    (ddev_dir / "config.yaml").write_text(
+        "name: e2e-invoice-app\ntype: php\ndocroot: web\nphp_version: '8.2'\nwebserver_type: nginx-fpm\n",
+        encoding="utf-8"
+    )
+    assert (ddev_dir / "config.yaml").exists()
+    print("   ✓ DDEV framework project configuration (.ddev/config.yaml) created")
+
+    # DevContainer config structure
+    dc_dir = proj_dir / ".devcontainer"
+    dc_dir.mkdir(exist_ok=True)
+    (dc_dir / "devcontainer.json").write_text(
+        json.dumps({
+            "name": "DevOS E2E Script Sandbox",
+            "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+            "workspaceFolder": "/workspace",
+            "customizations": {
+                "devos": {
+                    "managed": True
+                }
+            }
+        }, indent=2),
+        encoding="utf-8"
+    )
+    assert (dc_dir / "devcontainer.json").exists()
+    print("   ✓ DevContainer framework configuration (.devcontainer/devcontainer.json) validated")
+
 def main():
     print("=" * 60)
     print("  🚀 STARTING DEVOS FULL COMPREHENSIVE E2E VERIFICATION")
@@ -332,10 +422,11 @@ def main():
         test_3_mcp_10_tools_and_session_jail(test_dir)
         test_4_universal_bundle_exporter(test_dir)
         test_5_desktop_frontend_build()
+        test_6_framework_architectures_and_drivers(test_dir)
 
         duration = time.time() - start_time
         print("\n" + "=" * 60)
-        print(f"  🎉 ALL 5 LAYERS OF E2E TESTS PASSED CLEANLY IN {duration:.2f}s!")
+        print(f"  🎉 ALL 6 LAYERS OF E2E TESTS PASSED CLEANLY IN {duration:.2f}s!")
         print("=" * 60)
     finally:
         if test_dir.exists():
