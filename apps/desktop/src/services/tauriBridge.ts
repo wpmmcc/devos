@@ -154,6 +154,18 @@ export const Bridge = {
 
   reconfigureWebPorts: (projectPath: string, httpPort: number, httpsPort: number) =>
     invokeTauri<string>('reconfigure_web_ports', { projectPath, httpPort, httpsPort }),
+
+  getMirrorsConfig: () =>
+    invokeTauri<any>('get_mirrors_config'),
+
+  saveMirrorsConfig: (config: any) =>
+    invokeTauri<boolean>('save_mirrors_config', { config }),
+
+  raceMirrorsSpeed: (candidates: string[]) =>
+    invokeTauri<{ selected_url: string; latency_ms: number; error?: string }>('race_mirrors_speed', { candidates }),
+
+  importLocalToolPackage: (toolName: string, sourcePath: string) =>
+    invokeTauri<string>('import_local_tool_package', { toolName, sourcePath }),
 };
 
 // Mock Fallbacks for Browser

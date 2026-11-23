@@ -610,6 +610,31 @@ fn verify_agent_connection(agent_id: String, project_path: Option<String>) -> Ap
     }
 }
 
+#[tauri::command]
+fn get_mirrors_config() -> ApiResponse<devos_core::MirrorsConfig> {
+    let cfg = devos_core::MirrorManager::load_config();
+    ApiResponse::success(cfg)
+}
+
+#[tauri::command]
+fn save_mirrors_config(config: devos_core::MirrorsConfig) -> ApiResponse<bool> {
+    let res = devos_core::MirrorManager::save_config(&config).map(|_| true);
+    to_api_resp(res)
+}
+
+#[tauri::command]
+async fn race_mirrors_speed(candidates: Vec<String>) -> ApiResponse<devos_core::MirrorRaceResult> {
+    let res = devos_core::MirrorManager::race_mirrors(&candidates).await;
+    ApiResponse::success(res)
+}
+
+#[tauri::command]
+fn import_local_tool_package(tool_name: String, source_path: String) -> ApiResponse<String> {
+    let res = devos_core::MirrorManager::import_local_archive(&tool_name, &source_path)
+        .map(|p| p.display().to_string());
+    to_api_resp(res)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -646,7 +671,11 @@ pub fn run() {
             get_manual_config_snippet,
             verify_agent_connection,
             inspect_port_occupant,
-            reconfigure_web_ports
+            reconfigure_web_ports,
+            get_mirrors_config,
+            save_mirrors_config,
+            race_mirrors_speed,
+            import_local_tool_package
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
