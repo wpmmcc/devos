@@ -353,25 +353,250 @@ impl ProjectManager {
                 path: p.display().to_string(),
             });
         }
-        let slug = if let Ok((_, proj)) = Self::find_and_load(p) {
-            proj.slug
+        let (slug, name, project_type_str) = if let Ok((_, proj)) = Self::find_and_load(p) {
+            let pt = match proj.project_type {
+                ProjectType::Web => "web",
+                ProjectType::Script => "script",
+                ProjectType::Hybrid => "hybrid",
+            };
+            (proj.slug, proj.name, pt.to_string())
         } else {
-            p.file_name()
+            let inferred = p
+                .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown")
-                .to_string()
+                .to_string();
+            (inferred.clone(), inferred, "unknown".to_string())
         };
+
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
         let trash_dir = home.join(".devos").join("trash");
         fs::create_dir_all(&trash_dir)?;
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
         let dest_name = format!("{}_{}", timestamp, slug);
-        let dest_path = trash_dir.join(dest_name);
+        let dest_path = trash_dir.join(&dest_name);
         fs::rename(p, &dest_path)?;
+
+        // Record metadata inside the trashed directory
+        let meta = devos_schema::TrashMetadata {
+            original_path: p.display().to_string(),
+            name,
+            slug,
+            project_type: project_type_str,
+            trashed_at: chrono::Utc::now().to_rfc3339(),
+        };
+        let _ = atomic_write_json(dest_path.join(".trash_meta.json"), &meta);
 
         if let Some(database) = db {
             let _ = database.remove_recent_project(&p.display().to_string());
         }
         Ok(dest_path)
     }
+
+    /// List all trashed projects in ~/.devos/trash/
+    pub fn list_trash() -> Result<Vec<devos_schema::TrashedProject>> {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let trash_dir = home.join(".devos").join("trash");
+        if !trash_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut list = Vec::new();
+        let entries = fs::read_dir(&trash_dir)?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let trash_id = path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                if trash_id.is_empty() || trash_id.starts_with('.') {
+                    continue;
+                }
+
+                let size_bytes = calculate_dir_size(&path);
+                let meta_path = path.join(".trash_meta.json");
+
+                if meta_path.exists() {
+                    if let Ok(meta) = read_json::<_, devos_schema::TrashMetadata>(&meta_path) {
+                        list.push(devos_schema::TrashedProject {
+                            trash_id,
+                            original_path: meta.original_path,
+                            name: meta.name,
+                            slug: meta.slug,
+                            project_type: meta.project_type,
+                            trashed_at: meta.trashed_at,
+                            size_bytes,
+                        });
+                        continue;
+                    }
+                }
+
+                // Fallback for legacy trash folders or folders without metadata
+                let (slug, name, project_type) = if let Ok((_, proj)) = Self::find_and_load(&path) {
+                    let pt = match proj.project_type {
+                        ProjectType::Web => "web",
+                        ProjectType::Script => "script",
+                        ProjectType::Hybrid => "hybrid",
+                    };
+                    (proj.slug, proj.name, pt.to_string())
+                } else {
+                    let parts: Vec<&str> = trash_id.splitn(3, '_').collect();
+                    let inferred_slug = if parts.len() >= 3 {
+                        parts[2].to_string()
+                    } else {
+                        trash_id.clone()
+                    };
+                    (inferred_slug.clone(), inferred_slug, "unknown".to_string())
+                };
+
+                let trashed_at = if let Ok(metadata) = fs::metadata(&path) {
+                    if let Ok(modified) = metadata.modified() {
+                        let dt: chrono::DateTime<chrono::Utc> = modified.into();
+                        dt.to_rfc3339()
+                    } else {
+                        chrono::Utc::now().to_rfc3339()
+                    }
+                } else {
+                    chrono::Utc::now().to_rfc3339()
+                };
+
+                list.push(devos_schema::TrashedProject {
+                    trash_id,
+                    original_path: "Unknown".to_string(),
+                    name,
+                    slug,
+                    project_type,
+                    trashed_at,
+                    size_bytes,
+                });
+            }
+        }
+
+        list.sort_by(|a, b| b.trashed_at.cmp(&a.trashed_at));
+        Ok(list)
+    }
+
+    /// Restore a trashed project back to its original location or a custom target path
+    pub fn restore_from_trash(
+        trash_id: &str,
+        target_path: Option<&Path>,
+        db: Option<&Database>,
+    ) -> Result<PathBuf> {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let trash_item_path = home.join(".devos").join("trash").join(trash_id);
+        if !trash_item_path.exists() {
+            return Err(DevosError::Custom {
+                code: "TRASH_ITEM_NOT_FOUND".to_string(),
+                message: format!("Trash item {} not found", trash_id),
+                hint: Some("Check list of trashed items with list_trash".to_string()),
+                plain_message: Some(format!("回收站中未找到指定项目: {}", trash_id)),
+            });
+        }
+
+        let meta_path = trash_item_path.join(".trash_meta.json");
+        let meta = if meta_path.exists() {
+            read_json::<_, devos_schema::TrashMetadata>(&meta_path).ok()
+        } else {
+            None
+        };
+
+        let dest = if let Some(target) = target_path {
+            target.to_path_buf()
+        } else if let Some(ref m) = meta {
+            if !m.original_path.is_empty() && m.original_path != "Unknown" {
+                PathBuf::from(&m.original_path)
+            } else {
+                home.join("DevOSProjects").join(&m.slug)
+            }
+        } else {
+            let slug = trash_id.splitn(3, '_').nth(2).unwrap_or(trash_id);
+            home.join("DevOSProjects").join(slug)
+        };
+
+        if dest.exists() {
+            return Err(DevosError::Custom {
+                code: "DESTINATION_ALREADY_EXISTS".to_string(),
+                message: format!("Target restoration path already exists: {}", dest.display()),
+                hint: Some("Remove or rename the existing folder, or specify a custom target path.".to_string()),
+                plain_message: Some(format!(
+                    "恢复目标路径已存在同名文件夹: {}，请先移除或指定新路径",
+                    dest.display()
+                )),
+            });
+        }
+
+        if let Some(parent) = dest.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        // Clean up .trash_meta.json before restoring
+        let _ = fs::remove_file(&meta_path);
+
+        // Move from trash to destination
+        fs::rename(&trash_item_path, &dest)?;
+
+        // If devos.json exists, re-index in DB and add to recent_projects
+        if let Ok((root, proj)) = Self::find_and_load(&dest) {
+            if let Some(database) = db {
+                let p_type = match proj.project_type {
+                    ProjectType::Web => "web",
+                    ProjectType::Script => "script",
+                    ProjectType::Hybrid => "hybrid",
+                };
+                let _ = database.add_recent_project(&root.display().to_string(), &proj.name, p_type);
+                let _ = Self::sync_to_db(&root, &proj, database);
+            }
+        }
+
+        Ok(dest)
+    }
+
+    /// Permanently delete a specific trash item
+    pub fn delete_trash_item(trash_id: &str) -> Result<()> {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let trash_item_path = home.join(".devos").join("trash").join(trash_id);
+        if trash_item_path.exists() {
+            fs::remove_dir_all(&trash_item_path)?;
+        }
+        Ok(())
+    }
+
+    /// Permanently purge all items from ~/.devos/trash/
+    pub fn empty_trash() -> Result<u64> {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let trash_dir = home.join(".devos").join("trash");
+        if !trash_dir.exists() {
+            return Ok(0);
+        }
+
+        let total_freed = calculate_dir_size(&trash_dir);
+        let entries = fs::read_dir(&trash_dir)?;
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                let _ = fs::remove_dir_all(&p);
+            } else {
+                let _ = fs::remove_file(&p);
+            }
+        }
+        Ok(total_freed)
+    }
+}
+
+/// Recursively calculate the size in bytes of a directory
+pub fn calculate_dir_size(path: &Path) -> u64 {
+    let mut total = 0;
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                total += calculate_dir_size(&p);
+            } else if let Ok(meta) = p.metadata() {
+                total += meta.len();
+            }
+        }
+    }
+    total
 }

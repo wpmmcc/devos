@@ -18,6 +18,7 @@ import { LogViewerModal } from './components/LogViewerModal';
 import { AgentConnectModal } from './components/AgentConnectModal';
 import { SnapshotModal } from './components/SnapshotModal';
 import { TrashConfirmModal } from './components/TrashConfirmModal';
+import { TrashViewerModal } from './components/TrashViewerModal';
 import { ToastContainer, ToastItem } from './components/ToastContainer';
 import { switchLanguage } from './i18n';
 import {
@@ -56,6 +57,7 @@ export const App: React.FC = () => {
   const [isAgentConnectOpen, setIsAgentConnectOpen] = useState(false);
   const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+  const [isTrashViewerOpen, setIsTrashViewerOpen] = useState(false);
   const [projectToTrash, setProjectToTrash] = useState<RecentProjectDto | null>(null);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
@@ -133,7 +135,10 @@ export const App: React.FC = () => {
   const handleConfirmTrash = async (p: RecentProjectDto) => {
     const res = await Bridge.trashProject(p.path);
     if (res.ok) {
-      addToast('success', `项目「${p.name}」已安全移入 DevOS 回收站归档`);
+      addToast(
+        'success',
+        `项目「${p.name}」已安全移入 DevOS 回收站归档。可点击左侧回收站图标随时查看或恢复。`
+      );
       const recents = await loadRecentProjects();
       if (currentProjectPathRef.current === p.path) {
         if (recents.length > 0) {
@@ -409,6 +414,7 @@ export const App: React.FC = () => {
           setProjectToTrash(p);
           setIsTrashModalOpen(true);
         }}
+        onOpenTrashViewer={() => setIsTrashViewerOpen(true)}
         onOpenEditor={handleOpenEditor}
         isEnvRunning={isEnvRunning}
         isEnvBusy={isEnvBusy}
@@ -555,6 +561,7 @@ export const App: React.FC = () => {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onOpenLogs={() => setIsLogModalOpen(true)}
+        onOpenTrashViewer={() => setIsTrashViewerOpen(true)}
       />
 
       <TimeMachineModal
@@ -590,6 +597,16 @@ export const App: React.FC = () => {
         }}
         project={projectToTrash}
         onConfirm={handleConfirmTrash}
+      />
+
+      <TrashViewerModal
+        isOpen={isTrashViewerOpen}
+        onClose={() => setIsTrashViewerOpen(false)}
+        onProjectRestored={async (restoredPath) => {
+          await loadRecentProjects();
+          loadProjectData(restoredPath);
+        }}
+        showToast={addToast}
       />
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />

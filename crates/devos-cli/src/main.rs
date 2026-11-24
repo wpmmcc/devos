@@ -161,11 +161,15 @@ enum Commands {
         status: bool,
     },
 
-    /// Workspace and project utilities (safe trash, validate)
+    /// Workspace and project utilities (safe trash, list-trash, restore, delete-trash, empty-trash, validate)
     Project {
-        action: String, // trash, validate
+        action: String, // trash, list-trash, restore, delete-trash, empty-trash, validate
         #[arg(long)]
         path: Option<PathBuf>,
+        #[arg(long)]
+        trash_id: Option<String>,
+        #[arg(long)]
+        target_path: Option<PathBuf>,
     },
 
     /// Standardized delivery deployment plugins (VPS Docker Compose, recipes, rollback)
@@ -757,9 +761,15 @@ async fn main() {
             print_result(json_mode, res);
         }
 
-        Commands::Project { action, path } => {
+        Commands::Project {
+            action,
+            path,
+            trash_id,
+            target_path,
+        } => {
             let res = (|| -> Result<serde_json::Value> {
                 let target = path
+                    .clone()
                     .or(cli.project_dir.clone())
                     .unwrap_or_else(|| PathBuf::from("."));
                 match action.as_str() {
@@ -769,6 +779,54 @@ async fn main() {
                         Ok(serde_json::json!({
                             "status": "trashed",
                             "trash_path": dest.display().to_string()
+                        }))
+                    }
+                    "list-trash" | "trash-list" => {
+                        let list = devos_core::ProjectManager::list_trash()?;
+                        Ok(serde_json::to_value(list)?)
+                    }
+                    "restore" | "restore-trash" => {
+                        let id = trash_id
+                            .as_deref()
+                            .or_else(|| path.as_ref().and_then(|p| p.to_str()))
+                            .ok_or_else(|| DevosError::Custom {
+                                code: "MISSING_TRASH_ID".to_string(),
+                                message: "Missing --trash-id argument for restore".to_string(),
+                                hint: Some("Specify --trash-id <TRASH_ID>".to_string()),
+                                plain_message: Some("恢复项目时请指定 --trash-id 参数".to_string()),
+                            })?;
+                        let db = Database::open_global().ok();
+                        let dest = devos_core::ProjectManager::restore_from_trash(
+                            id,
+                            target_path.as_deref(),
+                            db.as_ref(),
+                        )?;
+                        Ok(serde_json::json!({
+                            "status": "restored",
+                            "restored_path": dest.display().to_string()
+                        }))
+                    }
+                    "delete-trash" => {
+                        let id = trash_id
+                            .as_deref()
+                            .or_else(|| path.as_ref().and_then(|p| p.to_str()))
+                            .ok_or_else(|| DevosError::Custom {
+                                code: "MISSING_TRASH_ID".to_string(),
+                                message: "Missing --trash-id argument for delete-trash".to_string(),
+                                hint: Some("Specify --trash-id <TRASH_ID>".to_string()),
+                                plain_message: Some("彻底删除项目时请指定 --trash-id 参数".to_string()),
+                            })?;
+                        devos_core::ProjectManager::delete_trash_item(id)?;
+                        Ok(serde_json::json!({
+                            "status": "deleted",
+                            "trash_id": id
+                        }))
+                    }
+                    "empty-trash" => {
+                        let freed = devos_core::ProjectManager::empty_trash()?;
+                        Ok(serde_json::json!({
+                            "status": "emptied",
+                            "freed_bytes": freed
                         }))
                     }
                     "validate" => {
@@ -782,7 +840,10 @@ async fn main() {
                     _ => Err(DevosError::Custom {
                         code: "UNKNOWN_ACTION".to_string(),
                         message: format!("Unknown project action: {}", action),
-                        hint: Some("Supported: trash, validate".to_string()),
+                        hint: Some(
+                            "Supported: trash, list-trash, restore, delete-trash, empty-trash, validate"
+                                .to_string(),
+                        ),
                         plain_message: Some(format!("未知的项目操作: {}", action)),
                     }),
                 }

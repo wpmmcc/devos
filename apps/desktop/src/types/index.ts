@@ -249,3 +249,14 @@ export interface LogFilter {
   limit?: number;
 }
 
+export interface TrashedProject {
+  trash_id: string;
+  original_path: string;
+  name: string;
+  slug: string;
+  project_type: string;
+  trashed_at: string;
+  size_bytes: number;
+}
+
+

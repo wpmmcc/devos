@@ -878,6 +878,61 @@ fn trash_project(project_path: String) -> ApiResponse<String> {
 }
 
 #[tauri::command]
+fn list_trash() -> ApiResponse<Vec<devos_schema::TrashedProject>> {
+    let res = ProjectManager::list_trash();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn restore_from_trash(trash_id: String, target_path: Option<String>) -> ApiResponse<String> {
+    let res = (|| -> Result<String> {
+        let db = Database::open_global().ok();
+        let target = target_path.as_deref().map(Path::new);
+        let dest = ProjectManager::restore_from_trash(&trash_id, target, db.as_ref())?;
+        Ok(dest.display().to_string())
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn delete_trash_item(trash_id: String) -> ApiResponse<bool> {
+    let res = (|| -> Result<bool> {
+        ProjectManager::delete_trash_item(&trash_id)?;
+        Ok(true)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn empty_trash() -> ApiResponse<u64> {
+    let res = ProjectManager::empty_trash();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn open_trash_dir() -> ApiResponse<bool> {
+    let res = (|| -> Result<bool> {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        let trash_dir = home.join(".devos").join("trash");
+        let _ = std::fs::create_dir_all(&trash_dir);
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open").arg(&trash_dir).spawn();
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("explorer").arg(&trash_dir).spawn();
+        }
+        #[cfg(all(unix, not(target_os = "macos")))]
+        {
+            let _ = std::process::Command::new("xdg-open").arg(&trash_dir).spawn();
+        }
+        Ok(true)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
 fn open_in_finder(path: String) -> ApiResponse<bool> {
     let res = (|| -> Result<bool> {
         let p = Path::new(&path);
@@ -1125,6 +1180,11 @@ pub fn run() {
             get_storage_report,
             clean_storage,
             trash_project,
+            list_trash,
+            restore_from_trash,
+            delete_trash_item,
+            empty_trash,
+            open_trash_dir,
             open_in_finder,
             open_in_terminal,
             open_in_editor,

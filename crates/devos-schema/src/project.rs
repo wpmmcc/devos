@@ -198,3 +198,26 @@ impl DevosProject {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+#[ts(export)]
+pub struct TrashedProject {
+    pub trash_id: String,
+    pub original_path: String,
+    pub name: String,
+    pub slug: String,
+    pub project_type: String,
+    pub trashed_at: String,
+    pub size_bytes: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
+#[ts(export)]
+pub struct TrashMetadata {
+    pub original_path: String,
+    pub name: String,
+    pub slug: String,
+    pub project_type: String,
+    pub trashed_at: String,
+}
+

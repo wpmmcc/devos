@@ -8,6 +8,7 @@ import {
   LogFilter,
   RunManifest,
   ScriptContext,
+  TrashedProject,
 } from '../types';
 
 declare global {
@@ -223,6 +224,21 @@ export const Bridge = {
 
   trashProject: (projectPath: string) =>
     invokeTauri<string>('trash_project', { projectPath }),
+
+  listTrash: () =>
+    invokeTauri<TrashedProject[]>('list_trash'),
+
+  restoreFromTrash: (trashId: string, targetPath?: string) =>
+    invokeTauri<string>('restore_from_trash', { trashId, targetPath: targetPath || null }),
+
+  deleteTrashItem: (trashId: string) =>
+    invokeTauri<boolean>('delete_trash_item', { trashId }),
+
+  emptyTrash: () =>
+    invokeTauri<number>('empty_trash'),
+
+  openTrashDir: () =>
+    invokeTauri<boolean>('open_trash_dir'),
 
   openInFinder: (path: string) =>
     invokeTauri<boolean>('open_in_finder', { path }),
@@ -524,6 +540,26 @@ function mockHandler<T>(cmd: string, args: Record<string, any>): ApiResponse<T> 
 
   if (cmd === 'trash_project') {
     return { ok: true, data: '~/.devos/trash/demo' as any };
+  }
+
+  if (cmd === 'list_trash') {
+    return { ok: true, data: [] as any };
+  }
+
+  if (cmd === 'restore_from_trash') {
+    return { ok: true, data: '~/DevOSProjects/restored' as any };
+  }
+
+  if (cmd === 'delete_trash_item') {
+    return { ok: true, data: true as any };
+  }
+
+  if (cmd === 'empty_trash') {
+    return { ok: true, data: 0 as any };
+  }
+
+  if (cmd === 'open_trash_dir') {
+    return { ok: true, data: true as any };
   }
 
   if (cmd === 'list_deploy_plugins') {

@@ -8,9 +8,10 @@ interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenLogs?: () => void;
+  onOpenTrashViewer?: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onOpenLogs }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onOpenLogs, onOpenTrashViewer }) => {
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<'general' | 'diagnostics' | 'about'>('general');
   const [theme, setTheme] = useState<'system' | 'dark' | 'light'>('dark');
@@ -233,6 +234,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
                 >
                   <Terminal size={14} className="text-emerald-400" />
                   <span>{t('modals.settings.openLogViewerBtn')}</span>
+                </button>
+              )}
+
+              {onOpenTrashViewer && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenTrashViewer();
+                  }}
+                  className="w-full py-2.5 bg-[#1e2433] hover:bg-[#283144] text-slate-200 border border-[#2d374d] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                >
+                  <Shield size={14} className="text-rose-400" />
+                  <span>查看与管理项目回收站 (Project Trash)</span>
                 </button>
               )}
             </div>

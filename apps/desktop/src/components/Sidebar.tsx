@@ -35,6 +35,7 @@ interface SidebarProps {
   onSelectProjectByPath: (path: string) => void;
   onOpenNewProject: () => void;
   onOpenTrashModal?: (project: RecentProjectDto) => void;
+  onOpenTrashViewer?: () => void;
   onOpenEditor?: (path: string) => void;
   // Project-level runtime controls:
   isEnvRunning?: boolean;
@@ -63,6 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectProjectByPath,
   onOpenNewProject,
   onOpenTrashModal,
+  onOpenTrashViewer,
   onOpenEditor,
   isEnvRunning = true,
   isEnvBusy = false,
@@ -101,13 +103,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Projects Section Header */}
         <div className="flex items-center justify-between text-xs text-slate-400 px-1 font-medium">
           <span className="font-semibold text-slate-300">{t('sidebar.myProjects')}</span>
-          <button
-            onClick={onOpenNewProject}
-            className="p-1 hover:text-emerald-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
-            title="新建或导入项目: 支持 Web 应用、脚本任务与自定义容器"
-          >
-            <Plus size={14} />
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={onOpenTrashViewer}
+              className="p-1 hover:text-rose-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
+              title="项目回收站 (Project Trash): 查看归档、一键恢复或彻底粉碎"
+            >
+              <Trash2 size={13} />
+            </button>
+            <button
+              onClick={onOpenNewProject}
+              className="p-1 hover:text-emerald-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
+              title="新建或导入项目: 支持 Web 应用、脚本任务与自定义容器"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Project Items */}

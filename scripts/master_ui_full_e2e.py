@@ -135,6 +135,13 @@ def main():
     time.sleep(0.5)
     screenshot("04b_trash_modal_cancelled")
 
+    # Test Project Trash Viewer Modal
+    print("\n[TEST 4d] Testing Project Trash Viewer Modal...")
+    click_web_button('first button of grp whose title contains "项目回收站" or help contains "项目回收站"')
+    time.sleep(1.0)
+    screenshot("04c_trash_viewer_modal_opened")
+    press_esc()
+
     # 5. Testing '在访达中显示' (Finder) & '在终端中打开' (Terminal)
     print("\n[TEST 5] Testing '访达' (Finder) button...")
     click_web_button('first button of grp whose name is "访达"')

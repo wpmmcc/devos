@@ -22,7 +22,7 @@ pub use issue::{
 pub use log::{LogEntry, LogFilter, LogLevel, LogSource};
 pub use project::{
     DevosProject, EnvironmentsConfig, GuardrailsConfig, HealthCheckConfig, ProjectMode,
-    ProjectType, ScriptEnvironment, WebEnvironment, WorkspacePaths,
+    ProjectType, ScriptEnvironment, TrashedProject, TrashMetadata, WebEnvironment, WorkspacePaths,
 };
 pub use response::{ApiErrorDetail, ApiResponse};
 pub use run_manifest::{
