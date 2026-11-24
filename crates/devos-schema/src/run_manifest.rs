@@ -25,6 +25,7 @@ pub struct RunInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[ts(type = "any")]
     pub default: Option<serde_json::Value>,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub options: Option<Vec<String>>,
 }
@@ -59,12 +60,14 @@ pub struct RunTarget {
     #[serde(default = "default_env")]
     pub env: String,
     pub command: String,
+    #[ts(type = "number")]
     #[serde(default = "default_timeout")]
     pub timeout_sec: u64,
     #[serde(default)]
     pub inputs: Vec<RunInput>,
     #[serde(default)]
     pub expected_outputs: Vec<ExpectedOutput>,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub smoke_test: Option<SmokeTestConfig>,
 }

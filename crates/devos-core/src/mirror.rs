@@ -141,11 +141,17 @@ impl MirrorManager {
             .join("mirrors.json")
     }
 
-    /// Load mirrors configuration, falling back to built-in default
+    /// Load mirrors configuration, falling back to declared assets/mirrors.json or built-in default
     pub fn load_config() -> MirrorsConfig {
         let p = Self::config_path();
         if p.exists() {
             if let Ok(cfg) = read_json::<_, MirrorsConfig>(&p) {
+                return cfg;
+            }
+        }
+        let asset_path = PathBuf::from("assets").join("mirrors.json");
+        if asset_path.exists() {
+            if let Ok(cfg) = read_json::<_, MirrorsConfig>(&asset_path) {
                 return cfg;
             }
         }

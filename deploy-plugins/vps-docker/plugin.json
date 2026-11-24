@@ -1,0 +1,53 @@
+{
+  "id": "vps-docker",
+  "name": "通用 Linux VPS (SSH + Docker Compose)",
+  "version": "1.0.0",
+  "author": "DevOS Team",
+  "description": "面向任意安装了 Docker 的云主机/VPS，通过 SSH 自动化上传交付包、拉起容器编排并实现保留回滚。",
+  "plugin_type": "recipe",
+  "form_fields": [
+    {
+      "name": "host",
+      "label": "服务器 IP / 域名",
+      "field_type": "text",
+      "required": true,
+      "hint": "如 123.45.67.89 或 deploy.mysite.com",
+      "is_secret": false
+    },
+    {
+      "name": "port",
+      "label": "SSH 端口",
+      "field_type": "number",
+      "required": true,
+      "default_value": "22",
+      "hint": "默认 22",
+      "is_secret": false
+    },
+    {
+      "name": "user",
+      "label": "登录用户名",
+      "field_type": "text",
+      "required": true,
+      "default_value": "root",
+      "hint": "建议使用具有 Docker 权限的用户",
+      "is_secret": false
+    },
+    {
+      "name": "ssh_key_or_password",
+      "label": "SSH 密码或私钥",
+      "field_type": "password",
+      "required": true,
+      "hint": "受系统安全保护，严禁明文暴露给外部 Agent",
+      "is_secret": true
+    },
+    {
+      "name": "deploy_dir",
+      "label": "服务器部署目标目录",
+      "field_type": "text",
+      "required": true,
+      "default_value": "/opt/devos-apps/{{project_slug}}",
+      "hint": "远程服务器上的存放路径",
+      "is_secret": false
+    }
+  ]
+}

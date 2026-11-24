@@ -2,4 +2,4 @@
 import type { LogLevel } from "./LogLevel";
 import type { LogSource } from "./LogSource";
 
-export type LogFilter = { min_level: LogLevel | null, source: LogSource | null, query: string | null, limit: number | null, };
+export type LogFilter = { min_level?: LogLevel, source?: LogSource, query?: string, limit?: number, };

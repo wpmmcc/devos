@@ -1360,6 +1360,47 @@ fn rollback_deployment(
     to_api_resp(res)
 }
 
+#[tauri::command]
+async fn bus_dispatch(
+    root: String,
+    command_id: String,
+    payload: serde_json::Value,
+    locale: Option<String>,
+) -> std::result::Result<serde_json::Value, String> {
+    let (root_path, project) = load_project_safe(&root)
+        .map_err(|e| format!("Failed to load project: {}", e))?;
+    let loc = locale.unwrap_or_else(|| "zh-CN".to_string());
+    let envelope = devos_core::CommandBus::dispatch(
+        &root_path,
+        &project,
+        &command_id,
+        &payload,
+        devos_schema::CallerType::HumanUi,
+        &loc,
+    );
+    if envelope.ok {
+        Ok(serde_json::json!({
+            "ok": true,
+            "data": envelope.data,
+            "meta": envelope.meta,
+        }))
+    } else {
+        let err = envelope.error.unwrap_or(devos_schema::CommandErrorDetail {
+            code: "INTERNAL_ERROR".to_string(),
+            params: None,
+            message: "Command execution failed".to_string(),
+            hint: None,
+            retryable: false,
+            untrusted_log_excerpt: None,
+        });
+        Ok(serde_json::json!({
+            "ok": false,
+            "error": err,
+            "meta": envelope.meta,
+        }))
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1373,6 +1414,7 @@ pub fn run() {
         .manage(ActiveWatcherState(Mutex::new(None)))
         .manage(ActiveEnvLocks(std::sync::Arc::new(Mutex::new(HashSet::new()))))
         .invoke_handler(tauri::generate_handler![
+            bus_dispatch,
             run_preflight_doctor,
             auto_fix_environment,
             get_recent_projects,

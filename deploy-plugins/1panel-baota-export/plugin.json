@@ -1,0 +1,28 @@
+{
+  "id": "panel-export",
+  "name": "1Panel / 宝塔一键导入导出包",
+  "version": "1.0.0",
+  "author": "DevOS Team",
+  "description": "针对国内主流运维面板（1Panel、宝塔、飞致云等）标准优化的自包含归档包，含标准 docker-compose.yml、初始化 SQL 和导入脚本。",
+  "plugin_type": "recipe",
+  "form_fields": [
+    {
+      "name": "target_panel",
+      "label": "目标面板类型",
+      "field_type": "select",
+      "required": true,
+      "default_value": "1panel",
+      "hint": "选择 1Panel 容器应用或宝塔 Docker 网站",
+      "is_secret": false
+    },
+    {
+      "name": "include_db_dump",
+      "label": "包含本地数据库快照",
+      "field_type": "checkbox",
+      "required": false,
+      "default_value": "true",
+      "hint": "将当前开发环境的数据库结构与数据导出到 dump.sql",
+      "is_secret": false
+    }
+  ]
+}

@@ -2,4 +2,4 @@
 import type { LogLevel } from "./LogLevel";
 import type { LogSource } from "./LogSource";
 
-export type LogEntry = { id: string, timestamp: string, level: LogLevel, source: LogSource, message: string, target: string | null, project_slug: string | null, };
+export type LogEntry = { id: string, timestamp: string, level: LogLevel, source: LogSource, message: string, target?: string, project_slug?: string, };

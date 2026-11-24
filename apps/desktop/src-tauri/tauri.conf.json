@@ -11,6 +11,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "DevOS - Agent Workbench",
         "width": 1280,
         "height": 840,
@@ -22,12 +23,22 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": [
+        "default"
+      ]
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "DevOS - Local Agent Workbench & Project Orchestration",
+    "longDescription": "DevOS integrates heterogeneous container runtimes (DDEV, DevContainers, Docker), unified command bus, VCS time machine, and AI agent control plane into a project-centric desktop environment.",
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "frameworks": []
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

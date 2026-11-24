@@ -7,8 +7,10 @@ pub struct SearchResult {
     pub category: String, // "card" | "issue" | "checkpoint" | "project" | "decision" | "action"
     pub id: String,
     pub title: String,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subtitle: Option<String>,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_slug: Option<String>,
 }

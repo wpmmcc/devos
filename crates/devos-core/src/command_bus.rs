@@ -191,6 +191,71 @@ impl CommandBus {
                 )?;
                 Ok(serde_json::to_value(card)?)
             }
+            "decision.create" => {
+                let question = payload["question_plain"]
+                    .as_str()
+                    .or_else(|| payload["question"].as_str())
+                    .unwrap_or("Decision Required");
+                let context = payload["context_plain"]
+                    .as_str()
+                    .or_else(|| payload["context"].as_str())
+                    .unwrap_or("");
+                let linked_card = payload["linked_card_id"].as_str();
+                let options: Vec<devos_schema::DecisionOption> = serde_json::from_value(
+                    payload["options"].clone(),
+                )
+                .unwrap_or_else(|_| {
+                    vec![
+                        devos_schema::DecisionOption {
+                            id: "opt_1".to_string(),
+                            label: "Proceed with recommended approach".to_string(),
+                            tradeoff: None,
+                        },
+                        devos_schema::DecisionOption {
+                            id: "opt_2".to_string(),
+                            label: "Alternative fallback".to_string(),
+                            tradeoff: None,
+                        },
+                    ]
+                });
+                let db = crate::db::Database::open_global().ok();
+                let dec = crate::decision::DecisionManager::create_decision(
+                    root,
+                    &project.slug,
+                    question,
+                    context,
+                    options,
+                    linked_card,
+                    db.as_ref(),
+                )?;
+                Ok(serde_json::to_value(dec)?)
+            }
+            "decision.list" => {
+                let status = payload["status"].as_str();
+                let db = crate::db::Database::open_global().ok();
+                let decs = crate::decision::DecisionManager::list_decisions(
+                    root,
+                    Some(&project.slug),
+                    status,
+                    db.as_ref(),
+                )?;
+                Ok(serde_json::to_value(decs)?)
+            }
+            "decision.resolve" => {
+                let dec_id = payload["decision_id"].as_str().unwrap_or("");
+                let opt_id = payload["selected_option_id"]
+                    .as_str()
+                    .or_else(|| payload["option_id"].as_str())
+                    .unwrap_or("");
+                let db = crate::db::Database::open_global().ok();
+                let dec = crate::decision::DecisionManager::resolve_decision(
+                    root,
+                    dec_id,
+                    opt_id,
+                    db.as_ref(),
+                )?;
+                Ok(serde_json::to_value(dec)?)
+            }
 
             // Domain 4: Testing & Issues
             "test.submit" => {
@@ -239,6 +304,16 @@ impl CommandBus {
                 let cp = CheckpointManager::create_checkpoint(root, note, "user_manual")?;
                 Ok(serde_json::to_value(cp)?)
             }
+            "vcs.checkpoint.restore" => {
+                let cp_id = payload["checkpoint_id"].as_str().unwrap_or("");
+                CheckpointManager::restore_checkpoint(root, cp_id)?;
+                Ok(json!({ "restored": true, "checkpoint_id": cp_id }))
+            }
+            "vcs.diff" => {
+                let cp_id = payload["checkpoint_id"].as_str().unwrap_or("");
+                let diff = CheckpointManager::get_checkpoint_diff(root, cp_id)?;
+                Ok(serde_json::to_value(diff)?)
+            }
             "vcs.status" => {
                 let checkpoints = CheckpointManager::list_checkpoints(root)?;
                 Ok(json!({ "checkpoints_count": checkpoints.len() }))
@@ -259,6 +334,30 @@ impl CommandBus {
                 );
                 let val = DeployPluginManager::validate_target("vps-docker", &cfg)?;
                 Ok(serde_json::to_value(val)?)
+            }
+
+            // Domain 7: System & Search & Mirrors
+            "search.global" => {
+                let query = payload["query"].as_str().unwrap_or("");
+                let proj_slug = payload["project_slug"].as_str().or(Some(&project.slug));
+                if let Ok(db) = crate::db::Database::open_global() {
+                    let results = db.global_search(query, proj_slug)?;
+                    Ok(serde_json::to_value(results)?)
+                } else {
+                    Ok(json!([]))
+                }
+            }
+            "mirror.list" => {
+                let cfg = crate::mirror::MirrorManager::load_config();
+                Ok(serde_json::to_value(cfg)?)
+            }
+            "mirror.set" => {
+                let mut cfg = crate::mirror::MirrorManager::load_config();
+                if let Some(proxy) = payload["custom_proxy_url"].as_str() {
+                    cfg.custom_proxy_url = Some(proxy.to_string());
+                }
+                crate::mirror::MirrorManager::save_config(&cfg)?;
+                Ok(json!({ "saved": true }))
             }
 
             // Domain 7: System & Adapters

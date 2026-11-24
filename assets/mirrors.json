@@ -1,0 +1,45 @@
+{
+  "$schema": "https://devos.ai/schemas/mirrors.json",
+  "active_preset": "auto",
+  "custom_proxy_url": null,
+  "tools": {
+    "ddev": {
+      "tool_id": "ddev",
+      "name": "DDEV 网页与数据库环境",
+      "version": "v1.25.5",
+      "official_url": "https://github.com/ddev/ddev/releases/download/v1.25.5/ddev_macos-arm64.v1.25.5.tar.gz",
+      "china_mirrors": [
+        "https://gh-proxy.com/https://github.com/ddev/ddev/releases/download/v1.25.5/ddev_macos-arm64.v1.25.5.tar.gz",
+        "https://mirror.ghproxy.com/https://github.com/ddev/ddev/releases/download/v1.25.5/ddev_macos-arm64.v1.25.5.tar.gz"
+      ],
+      "sha256_macos_arm64": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256_macos_x64": null,
+      "sha256_win_x64": null,
+      "sha256_linux_x64": null
+    },
+    "mkcert": {
+      "tool_id": "mkcert",
+      "name": "mkcert 本地 HTTPS 证书工具",
+      "version": "v1.4.4",
+      "official_url": "https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-darwin-arm64",
+      "china_mirrors": [
+        "https://gh-proxy.com/https://github.com/FiloSottile/mkcert/releases/download/v1.4.4/mkcert-v1.4.4-darwin-arm64"
+      ],
+      "sha256_macos_arm64": null,
+      "sha256_macos_x64": null,
+      "sha256_win_x64": null,
+      "sha256_linux_x64": null
+    }
+  },
+  "docker_mirrors": [
+    "https://dockerproxy.com",
+    "https://mirror.baidubce.com",
+    "https://hub-mirror.c.163.com"
+  ],
+  "container_env_vars": {
+    "NPM_CONFIG_REGISTRY": "https://registry.npmmirror.com",
+    "PIP_INDEX_URL": "https://pypi.tuna.tsinghua.edu.cn/simple",
+    "GOPROXY": "https://goproxy.cn,direct",
+    "RUSTUP_DIST_SERVER": "https://rsproxy.cn"
+  }
+}

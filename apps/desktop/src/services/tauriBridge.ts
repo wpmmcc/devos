@@ -42,6 +42,20 @@ async function invokeTauri<T>(cmd: string, args: Record<string, any> = {}): Prom
 }
 
 export const Bridge = {
+  dispatch: async <T = any>(
+    commandId: string,
+    payload: any = {},
+    projectRoot?: string,
+    locale?: string
+  ): Promise<ApiResponse<T>> => {
+    return invokeTauri<T>('bus_dispatch', {
+      root: projectRoot || '.',
+      commandId,
+      payload,
+      locale: locale || 'zh-CN',
+    });
+  },
+
   runDoctor: () => invokeTauri<DiagnosticItem[]>('run_preflight_doctor'),
   autoFixEnvironment: () => invokeTauri<DiagnosticItem[]>('auto_fix_environment'),
 

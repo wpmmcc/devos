@@ -3,4 +3,4 @@ import type { ExpectedOutput } from "./ExpectedOutput";
 import type { RunInput } from "./RunInput";
 import type { SmokeTestConfig } from "./SmokeTestConfig";
 
-export type RunTarget = { id: string, label: string, description: string, env: string, command: string, timeout_sec: bigint, inputs: Array<RunInput>, expected_outputs: Array<ExpectedOutput>, smoke_test: SmokeTestConfig | null, };
+export type RunTarget = { id: string, label: string, description: string, env: string, command: string, timeout_sec: number, inputs: Array<RunInput>, expected_outputs: Array<ExpectedOutput>, smoke_test?: SmokeTestConfig, };

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { AgentDetection, DevosProject } from '../types';
 import { Bridge } from '../services/tauriBridge';
+import { ReleaseDeliveryModal } from './ReleaseDeliveryModal';
 
 interface AssetsViewProps {
   project: DevosProject;
@@ -58,6 +59,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
   const [vpsValidationResult, setVpsValidationResult] = useState<any | null>(null);
   const [deployStep, setDeployStep] = useState<0 | 1 | 2 | 3>(0); // 0: Idle, 1: Plan, 2: Applying, 3: Done
   const [deployPercent, setDeployPercent] = useState(0);
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
 
   // Secrets Manager State
   const [dbPass, setDbPass] = useState('devos_secure_pwd_2026');
@@ -543,9 +545,18 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                     <Rocket className="text-emerald-400" size={18} />
                     <span>标准交付打包与部署中心</span>
                   </span>
-                  <span className="text-[11px] font-normal text-slate-400">
-                    一键导出离线独立部署包 / 插件化推送到目标服务器
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsDeliveryModalOpen(true)}
+                      className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs flex items-center gap-1.5 transition shadow"
+                    >
+                      <Rocket size={13} />
+                      <span>打开交付与部署控制面板</span>
+                    </button>
+                    <span className="text-[11px] font-normal text-slate-400">
+                      一键导出离线独立部署包 / 插件化推送到目标服务器
+                    </span>
+                  </div>
                 </h2>
               </div>
 
@@ -1088,6 +1099,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
           )}
         </div>
       </div>
+
+      <ReleaseDeliveryModal
+        isOpen={isDeliveryModalOpen}
+        onClose={() => setIsDeliveryModalOpen(false)}
+        project={project}
+      />
     </div>
   );
 };

@@ -208,6 +208,7 @@ pub struct TrashedProject {
     pub slug: String,
     pub project_type: String,
     pub trashed_at: String,
+    #[ts(type = "number")]
     pub size_bytes: u64,
 }
 

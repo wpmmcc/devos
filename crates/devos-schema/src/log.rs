@@ -87,8 +87,10 @@ pub struct LogEntry {
     pub level: LogLevel,
     pub source: LogSource,
     pub message: String,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_slug: Option<String>,
 }
@@ -96,12 +98,16 @@ pub struct LogEntry {
 #[derive(Serialize, Deserialize, Debug, Clone, Default, TS)]
 #[ts(export)]
 pub struct LogFilter {
+    #[ts(optional)]
     #[serde(default)]
     pub min_level: Option<LogLevel>,
+    #[ts(optional)]
     #[serde(default)]
     pub source: Option<LogSource>,
+    #[ts(optional)]
     #[serde(default)]
     pub query: Option<String>,
+    #[ts(optional)]
     #[serde(default)]
     pub limit: Option<usize>,
 }

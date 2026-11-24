@@ -1,0 +1,90 @@
+[
+  {
+    "id": "claude-code",
+    "name": "Claude Code (Anthropic)",
+    "description": "Anthropic 官方终端 Agent 工具",
+    "format": "standard_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "cursor",
+    "name": "Cursor",
+    "description": "基于 VS Code 定制的 AI 智能编程 IDE",
+    "format": "standard_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "windsurf",
+    "name": "Windsurf (Codeium)",
+    "description": "Codeium 出品的新一代 Flow Agent 编程 IDE",
+    "format": "standard_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "trae",
+    "name": "Trae (ByteDance)",
+    "description": "字节跳动自研 AI 编程 IDE",
+    "format": "standard_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "qoder",
+    "name": "Qoder",
+    "description": "腾讯云自研 AI 编程 IDE",
+    "format": "standard_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "codebuddy",
+    "name": "CodeBuddy",
+    "description": "基于云原生与大模型赋能的研发助理",
+    "format": "standard_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "codex",
+    "name": "Codex CLI",
+    "description": "基于 TOML 配置格式的自动化代码补全与调度 Agent",
+    "format": "codex_toml",
+    "is_global_only": true,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "opencode",
+    "name": "OpenCode",
+    "description": "开源终端多模型协作 Agent",
+    "format": "opencode_json",
+    "is_global_only": true,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "cline",
+    "name": "Cline (VS Code 扩展)",
+    "description": "在 VS Code 内执行自主编程任务的自治 Agent",
+    "format": "vscode_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "roo-code",
+    "name": "Roo Code (VS Code 扩展)",
+    "description": "增强型自主全栈开发 VS Code 扩展",
+    "format": "vscode_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  },
+  {
+    "id": "aider",
+    "name": "Aider CLI",
+    "description": "终端结对编程 AI Agent",
+    "format": "standard_json",
+    "is_global_only": false,
+    "manual_guide_needed": false
+  }
+]

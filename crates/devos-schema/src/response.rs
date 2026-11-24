@@ -6,8 +6,10 @@ use ts_rs::TS;
 pub struct ApiErrorDetail {
     pub code: String,
     pub message: String,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plain_message: Option<String>,
 }
@@ -16,8 +18,10 @@ pub struct ApiErrorDetail {
 #[ts(export)]
 pub struct ApiResponse<T> {
     pub ok: bool,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
+    #[ts(optional)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ApiErrorDetail>,
 }
