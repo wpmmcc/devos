@@ -136,6 +136,7 @@ export const TimeMachineModal: React.FC<TimeMachineModalProps> = ({
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-100 p-1.5 rounded-lg hover:bg-[#1a202e] transition"
+            title="关闭时光机 (快捷键 Esc)"
           >
             <X size={18} />
           </button>

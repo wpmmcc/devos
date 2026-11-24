@@ -54,6 +54,60 @@ export const App: React.FC = () => {
   const [isAgentConnectOpen, setIsAgentConnectOpen] = useState(false);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
+  // Environment Runtime state
+  const [isEnvRunning, setIsEnvRunning] = useState<boolean>(true);
+  const [isEnvBusy, setIsEnvBusy] = useState<boolean>(false);
+
+  const handleToggleEnv = async () => {
+    if (!project || isEnvBusy) return;
+    setIsEnvBusy(true);
+    if (isEnvRunning) {
+      const res = await Bridge.stopEnv('.', 'auto');
+      if (res.ok) {
+        setIsEnvRunning(false);
+        addToast('info', t('toast.envStopped'));
+      } else if (res.error) {
+        alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
+      }
+    } else {
+      const res = await Bridge.startEnv('.', 'auto');
+      if (res.ok) {
+        setIsEnvRunning(true);
+        addToast('success', t('toast.envStarted'));
+      } else if (res.error) {
+        alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
+      }
+    }
+    setIsEnvBusy(false);
+  };
+
+  const handleRestartEnv = async () => {
+    if (!project || isEnvBusy) return;
+    setIsEnvBusy(true);
+    addToast('info', t('topbar.restartingEnv'));
+    await Bridge.stopEnv('.', 'auto');
+    const res = await Bridge.startEnv('.', 'auto');
+    if (res.ok) {
+      setIsEnvRunning(true);
+      addToast('success', t('toast.envStarted'));
+    } else if (res.error) {
+      alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
+    }
+    setIsEnvBusy(false);
+  };
+
+  const handleTakeSnapshot = async () => {
+    if (!project) return;
+    const name = window.prompt(t('topbar.snapshotPrompt'), '');
+    if (name === null) return;
+    const res = await Bridge.createSnapshot('.', name);
+    if (res.ok) {
+      addToast('success', t('topbar.snapshotSuccess', { id: res.data || name }));
+    } else {
+      alert(`${t('common.error')}: ${res.error?.plain_message || res.error?.message}`);
+    }
+  };
+
   // Toasts state
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -300,7 +354,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#0b0d13]">
-      {/* 220px Sidebar */}
+      {/* 260px Sidebar */}
       <Sidebar
         currentProject={project}
         recentProjects={recentProjects}
@@ -310,16 +364,24 @@ export const App: React.FC = () => {
         testingCount={testingCount}
         onSelectProjectByPath={(path) => loadProjectData(path)}
         onOpenNewProject={() => setIsNewProjectOpen(true)}
+        isEnvRunning={isEnvRunning}
+        isEnvBusy={isEnvBusy}
+        onToggleEnv={handleToggleEnv}
+        onRestartEnv={handleRestartEnv}
+        onTakeSnapshot={handleTakeSnapshot}
+        onOpenTimeMachine={() => setIsTimeMachineOpen(true)}
+        onOpenLogs={() => setIsLogModalOpen(true)}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onOpenConflictDoctor={() => setIsConflictDoctorOpen(true)}
         onOpenAgentConnect={() => setIsAgentConnectOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        runningProjectsCount={project ? 1 : 0}
+        runningProjectsCount={isEnvRunning && project ? 1 : 0}
         onStopAllEnvironments={async () => {
           const ok = window.confirm(t('sidebar.stopAllConfirm'));
           if (!ok) return;
           if (project) {
             await Bridge.stopEnv('.', 'auto');
+            setIsEnvRunning(false);
           }
           addToast('info', t('sidebar.stopAllSuccess'));
         }}
@@ -334,12 +396,8 @@ export const App: React.FC = () => {
           onTabChange={setActiveTab}
           openIssuesCount={openIssuesCount}
           testingCount={testingCount}
+          isEnvRunning={isEnvRunning}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenTimeMachine={() => setIsTimeMachineOpen(true)}
-          onOpenLogs={() => setIsLogModalOpen(true)}
-          onOpenAgentConnect={() => setIsAgentConnectOpen(true)}
-          onShowToast={(type, msg) => addToast(type, msg)}
         />
 
         {/* Workspace Body */}

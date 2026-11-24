@@ -260,6 +260,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
             <button
               onClick={() => setSelectedCardId(null)}
               className="p-1 hover:bg-[#1e2330] text-slate-400 hover:text-slate-100 rounded transition"
+              title="关闭详情抽屉 (快捷键 Esc)"
             >
               <X size={15} />
             </button>

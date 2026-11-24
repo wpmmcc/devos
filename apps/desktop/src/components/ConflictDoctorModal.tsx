@@ -88,6 +88,7 @@ export const ConflictDoctorModal: React.FC<ConflictDoctorModalProps> = ({
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+            title="关闭诊断室 (快捷键 Esc)"
           >
             ✕
           </button>

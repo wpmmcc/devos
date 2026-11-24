@@ -198,7 +198,10 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
           <div className="flex-1 flex flex-col border-r border-[#1e2330]">
             {/* Simulated Browser Bar */}
             <div className="h-10 bg-[#161a24] border-b border-[#1e2330] px-3 flex items-center gap-2 text-xs">
-              <button className="p-1 hover:bg-[#232938] rounded text-slate-400 hover:text-slate-200 transition">
+              <button
+                className="p-1 hover:bg-[#232938] rounded text-slate-400 hover:text-slate-200 transition"
+                title="刷新页面预览"
+              >
                 <RotateCw size={12} />
               </button>
               <input
@@ -212,7 +215,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                 target="_blank"
                 rel="noreferrer"
                 className="p-1 hover:bg-[#232938] rounded text-slate-400 hover:text-slate-200 transition"
-                title="在系统浏览器打开"
+                title="在系统默认浏览器中打开链接"
               >
                 <ExternalLink size={12} />
               </a>
@@ -400,6 +403,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
                     onClick={handleRunScript}
                     disabled={isRunning}
                     className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition"
+                    title="运行测试脚本: 在本地沙盒容器中执行选定脚本目标并实时输出日志"
                   >
                     <Play size={13} />
                     <span>{isRunning ? t('testPreview.runningScript') : t('testPreview.runScript')}</span>

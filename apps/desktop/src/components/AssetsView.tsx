@@ -231,6 +231,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
               : 'text-slate-300 hover:bg-[#1a1f2c]'
           }`}
+          title="开发硬标准: 注入给 AI Agent 的架构规范与代码安全红线"
         >
           <ShieldAlert size={14} className="text-amber-400" />
           <span>{t('assets.tabStandards')}</span>
@@ -243,6 +244,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
               : 'text-slate-300 hover:bg-[#1a1f2c]'
           }`}
+          title="需求说明: 本项目权威业务功能范围与验收标准"
         >
           <BookOpen size={14} className="text-blue-400" />
           <span>{t('assets.tabRequirements')}</span>
@@ -255,6 +257,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
               : 'text-slate-300 hover:bg-[#1a1f2c]'
           }`}
+          title="运行清单: devos.json 容器配置、端口映射与执行依赖定义"
         >
           <Code2 size={14} className="text-purple-400" />
           <span>{t('assets.tabManifest')}</span>
@@ -267,6 +270,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
               : 'text-slate-300 hover:bg-[#1a1f2c]'
           }`}
+          title="避坑知识库: 常见报错与容器开发最佳实践速查"
         >
           <Lightbulb size={14} className="text-yellow-400" />
           <span>避坑知识库</span>
@@ -279,6 +283,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
               : 'text-slate-300 hover:bg-[#1a1f2c]'
           }`}
+          title="用户使用文档: DevOS 操作指南与指令手册"
         >
           <FileText size={14} className="text-slate-400" />
           <span>用户使用文档</span>
@@ -292,6 +297,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30'
                 : 'text-slate-300 hover:bg-[#1a1f2c]'
             }`}
+            title="AI Agent 连接中心: 检查与配置本机已安装的 AI Agent MCP"
           >
             <Bot size={14} className="text-cyan-400" />
             <span>{t('sidebar.connectAgents')}</span>
@@ -304,6 +310,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ project }) => {
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'text-slate-300 hover:bg-[#1a1f2c]'
             }`}
+            title="交付与部署: 打包通用交付件与一键同步至生产 VPS"
           >
             <Rocket size={14} className="text-emerald-400" />
             <span>{t('assets.tabDeploy')}</span>

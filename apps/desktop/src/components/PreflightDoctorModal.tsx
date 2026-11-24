@@ -127,6 +127,7 @@ export const PreflightDoctorModal: React.FC<PreflightDoctorModalProps> = ({
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-[#202636] transition"
+          title="关闭弹窗 (快捷键 Esc)"
         >
           <X size={16} />
         </button>

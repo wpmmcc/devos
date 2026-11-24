@@ -64,6 +64,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           <button
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-[#202738] transition"
+            title="关闭设置 (快捷键 Esc)"
           >
             <X size={16} />
           </button>

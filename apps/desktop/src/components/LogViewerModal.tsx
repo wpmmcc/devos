@@ -201,6 +201,7 @@ export const LogViewerModal: React.FC<LogViewerModalProps> = ({
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-slate-200 p-1.5 hover:bg-[#1f2433] rounded-lg transition ml-1"
+              title="关闭日志抽屉 (快捷键 Esc)"
             >
               <X size={16} />
             </button>
