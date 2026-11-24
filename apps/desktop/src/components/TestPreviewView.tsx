@@ -246,7 +246,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
           </div>
 
           {/* Right Acceptance Checklist Panel */}
-          <div className="w-80 bg-[#12151d] p-4 flex flex-col">
+          <div className="w-80 shrink-0 min-w-[280px] max-w-[340px] bg-[#12151d] p-4 flex flex-col border-l border-[#1e2330]">
             <h4 className="text-xs font-semibold text-slate-200 mb-3 flex items-center gap-1.5">
               <CheckCircle2 size={14} className="text-amber-400" />
               <span>{t('testPreview.checklistTitle', { count: checklist.length })}</span>

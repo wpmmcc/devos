@@ -54,26 +54,32 @@ impl ProjectWatcher {
                         let relative = path.strip_prefix(&root_path).unwrap_or(&path);
                         let rel_str = relative.to_string_lossy();
 
-                        let change_type =
-                            if rel_str.starts_with("board/") && rel_str.ends_with(".json") {
-                                let card_id = path
-                                    .file_stem()
-                                    .and_then(|s| s.to_str())
-                                    .map(|s| s.to_string());
-                                ProjectChangeEvent::BoardUpdated { card_id }
-                            } else if rel_str.starts_with("issues/") && rel_str.ends_with(".json") {
-                                let issue_id = path
-                                    .file_stem()
-                                    .and_then(|s| s.to_str())
-                                    .map(|s| s.to_string());
-                                ProjectChangeEvent::IssueUpdated { issue_id }
-                            } else if rel_str == "devos.json" || rel_str == "devos.run.json" {
-                                ProjectChangeEvent::ManifestUpdated
-                            } else if rel_str.starts_with("standards/") {
-                                ProjectChangeEvent::StandardUpdated
-                            } else {
-                                ProjectChangeEvent::Other
-                            };
+                        let is_json = path.extension().and_then(|s| s.to_str()) == Some("json");
+                        let is_board = (rel_str.starts_with("board/") || path.components().any(|c| c.as_os_str() == "board")) && is_json;
+                        let is_issues = (rel_str.starts_with("issues/") || path.components().any(|c| c.as_os_str() == "issues")) && is_json;
+                        let file_name = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
+                        let is_manifest = file_name == "devos.json" || file_name == "devos.run.json";
+                        let is_standards = rel_str.starts_with("standards/") || path.components().any(|c| c.as_os_str() == "standards");
+
+                        let change_type = if is_board {
+                            let card_id = path
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .map(|s| s.to_string());
+                            ProjectChangeEvent::BoardUpdated { card_id }
+                        } else if is_issues {
+                            let issue_id = path
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .map(|s| s.to_string());
+                            ProjectChangeEvent::IssueUpdated { issue_id }
+                        } else if is_manifest {
+                            ProjectChangeEvent::ManifestUpdated
+                        } else if is_standards {
+                            ProjectChangeEvent::StandardUpdated
+                        } else {
+                            ProjectChangeEvent::Other
+                        };
 
                         if change_type != ProjectChangeEvent::Other {
                             callback(change_type, path);

@@ -260,6 +260,30 @@ fn move_board_card(
 }
 
 #[tauri::command]
+fn create_board_card(
+    app: AppHandle,
+    project_path: String,
+    title: String,
+) -> ApiResponse<BoardCard> {
+    let res = (|| -> Result<BoardCard> {
+        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let card = BoardManager::upsert_card(
+            &root,
+            &project,
+            None,
+            Some(title),
+            BoardColumn::Todo,
+            "user",
+            None,
+            None,
+        )?;
+        let _ = app.emit("devos://board-updated", &card.card_id);
+        Ok(card)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
 fn list_issues(project_path: String, status: Option<String>) -> ApiResponse<Vec<Issue>> {
     let res = (|| -> Result<Vec<Issue>> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
@@ -946,6 +970,7 @@ pub fn run() {
             load_project,
             list_board_cards,
             move_board_card,
+            create_board_card,
             list_issues,
             create_web_issue,
             create_script_issue,

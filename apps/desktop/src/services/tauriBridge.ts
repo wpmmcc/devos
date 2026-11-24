@@ -76,6 +76,9 @@ export const Bridge = {
   moveCard: (projectPath: string, cardId: string, column: string, updatedBy = 'user') =>
     invokeTauri<BoardCard>('move_board_card', { projectPath, cardId, column, updatedBy }),
 
+  createCard: (projectPath: string, title: string) =>
+    invokeTauri<BoardCard>('create_board_card', { projectPath, title }),
+
   listIssues: (projectPath: string, status?: string) =>
     invokeTauri<Issue[]>('list_issues', { projectPath, status }),
 
@@ -611,6 +614,22 @@ function mockHandler<T>(cmd: string, args: Record<string, any>): ApiResponse<T> 
         '[ddev-web] Ready for HTTP connections on port 80',
       ] as any,
     };
+  }
+
+  if (cmd === 'create_board_card') {
+    const newCard = {
+      schema_version: '1.0',
+      card_id: `CARD-${Math.floor(Math.random() * 900) + 100}`,
+      title: args.title || '新增任务',
+      column: 'todo',
+      summary_plain: '',
+      updated_by: 'user',
+      checklist: [],
+      run_target_ids: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    return { ok: true, data: newCard as any };
   }
 
   return { ok: true, data: null as any };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ShieldCheck, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Sidebar } from './components/Sidebar';
@@ -33,6 +33,7 @@ import { Bridge } from './services/tauriBridge';
 export const App: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [currentProjectPath, setCurrentProjectPath] = useState<string>('.');
+  const currentProjectPathRef = useRef<string>('.');
   const [project, setProject] = useState<DevosProject | null>(null);
   const [recentProjects, setRecentProjects] = useState<RecentProjectDto[]>([]);
   const [activeTab, setActiveTab] = useState<'board' | 'test' | 'issues' | 'assets'>('board');
@@ -90,6 +91,7 @@ export const App: React.FC = () => {
   };
 
   const loadProjectData = async (projPath: string) => {
+    currentProjectPathRef.current = projPath;
     setCurrentProjectPath(projPath);
     const res = await Bridge.loadProject(projPath);
     if (res.ok && res.data) {
@@ -101,22 +103,25 @@ export const App: React.FC = () => {
     }
   };
 
-  const refreshCards = async (projPath = currentProjectPath) => {
-    const res = await Bridge.listCards(projPath);
+  const refreshCards = async (projPath?: string) => {
+    const target = projPath || currentProjectPathRef.current || '.';
+    const res = await Bridge.listCards(target);
     if (res.ok && res.data) {
       setCards(res.data);
     }
   };
 
-  const refreshIssues = async (projPath = currentProjectPath) => {
-    const res = await Bridge.listIssues(projPath);
+  const refreshIssues = async (projPath?: string) => {
+    const target = projPath || currentProjectPathRef.current || '.';
+    const res = await Bridge.listIssues(target);
     if (res.ok && res.data) {
       setIssues(res.data);
     }
   };
 
-  const refreshManifest = async (projPath = currentProjectPath) => {
-    const res = await Bridge.getRunManifest(projPath);
+  const refreshManifest = async (projPath?: string) => {
+    const target = projPath || currentProjectPathRef.current || '.';
+    const res = await Bridge.getRunManifest(target);
     if (res.ok && res.data) {
       setManifest(res.data);
     }
@@ -125,15 +130,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     // 1. Initial load
     loadRecentProjects().then(async (recents) => {
-      const res = await Bridge.loadProject('.');
-      if (res.ok && res.data) {
-        setProject(res.data);
-        refreshCards('.');
-        refreshIssues('.');
-        refreshManifest('.');
-      } else if (recents && recents.length > 0) {
-        loadProjectData(recents[0].path);
-      }
+      const initialPath = recents && recents.length > 0 ? recents[0].path : '.';
+      await loadProjectData(initialPath);
     });
 
     // 2. Global shortcut Cmd/Ctrl + K
@@ -151,26 +149,35 @@ export const App: React.FC = () => {
     let unlistenProject: any;
 
     Bridge.listenToEvent('devos://board-updated', () => {
-      refreshCards();
+      refreshCards(currentProjectPathRef.current);
     }).then((unlisten) => {
       unlistenBoard = unlisten;
     });
 
     Bridge.listenToEvent('devos://issues-updated', () => {
-      refreshIssues();
-      refreshCards();
+      refreshIssues(currentProjectPathRef.current);
+      refreshCards(currentProjectPathRef.current);
     }).then((unlisten) => {
       unlistenIssues = unlisten;
     });
 
     Bridge.listenToEvent('devos://project-updated', () => {
-      loadProjectData(currentProjectPath);
+      loadProjectData(currentProjectPathRef.current);
     }).then((unlisten) => {
       unlistenProject = unlisten;
     });
 
+    // 4. Lightweight 3-second heartbeat sync for external AI changes
+    const pollInterval = setInterval(() => {
+      if (currentProjectPathRef.current && currentProjectPathRef.current !== '.') {
+        refreshCards(currentProjectPathRef.current);
+        refreshIssues(currentProjectPathRef.current);
+      }
+    }, 3000);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      clearInterval(pollInterval);
       if (typeof unlistenBoard === 'function') unlistenBoard();
       if (typeof unlistenIssues === 'function') unlistenIssues();
       if (typeof unlistenProject === 'function') unlistenProject();
@@ -185,12 +192,20 @@ export const App: React.FC = () => {
   ) => {
     const res = await Bridge.initProject('.', slug, name, description, type);
     if (res.ok && res.data) {
-      setProject(res.data);
-      refreshCards('.');
-      refreshIssues('.');
-      refreshManifest('.');
-      loadRecentProjects();
+      await loadRecentProjects();
+      await loadProjectData(res.data.slug);
       addToast('success', t('common.success'));
+    }
+  };
+
+  const handleCreateCard = async (title: string) => {
+    if (!project) return;
+    const res = await Bridge.createCard(currentProjectPath, title);
+    if (res.ok) {
+      refreshCards();
+      addToast('success', t('toast.cardCreated', '新任务卡片已创建'));
+    } else if (res.error) {
+      alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
     }
   };
 
@@ -313,6 +328,7 @@ export const App: React.FC = () => {
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenTimeMachine={() => setIsTimeMachineOpen(true)}
           onOpenLogs={() => setIsLogModalOpen(true)}
+          onOpenAgentConnect={() => setIsAgentConnectOpen(true)}
           onShowToast={(type, msg) => addToast(type, msg)}
         />
 
@@ -324,6 +340,7 @@ export const App: React.FC = () => {
                 cards={cards}
                 onMoveCard={handleMoveCard}
                 onOpenTest={() => setActiveTab('test')}
+                onAddCard={handleCreateCard}
               />
             )}
 

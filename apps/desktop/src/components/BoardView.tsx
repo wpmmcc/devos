@@ -6,6 +6,7 @@ import {
   X,
   User,
   Bot,
+  Plus,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { BoardCard, BoardColumn } from '../types';
@@ -14,11 +15,32 @@ interface BoardViewProps {
   cards: BoardCard[];
   onMoveCard: (cardId: string, col: BoardColumn) => void;
   onOpenTest: (cardId: string) => void;
+  onAddCard?: (title: string) => Promise<void>;
 }
 
-export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenTest }) => {
+export const BoardView: React.FC<BoardViewProps> = ({
+  cards,
+  onMoveCard,
+  onOpenTest,
+  onAddCard,
+}) => {
   const { t } = useTranslation();
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [isAddingCard, setIsAddingCard] = useState(false);
+  const [newCardTitle, setNewCardTitle] = useState('');
+  const [isSubmittingCard, setIsSubmittingCard] = useState(false);
+
+  const handleCreateCardSubmit = async () => {
+    if (!newCardTitle.trim() || !onAddCard || isSubmittingCard) return;
+    setIsSubmittingCard(true);
+    try {
+      await onAddCard(newCardTitle.trim());
+      setNewCardTitle('');
+      setIsAddingCard(false);
+    } finally {
+      setIsSubmittingCard(false);
+    }
+  };
 
   const columns: { id: BoardColumn; title: string; countColor: string }[] = [
     { id: 'todo', title: t('board.todo'), countColor: 'text-slate-400 bg-slate-800' },
@@ -50,10 +72,61 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
                       {colCards.length}
                     </span>
                   </div>
+                  {col.id === 'todo' && onAddCard && (
+                    <button
+                      onClick={() => setIsAddingCard((prev) => !prev)}
+                      className="p-1 hover:text-emerald-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
+                      title={t('board.addCard')}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Cards Container */}
                 <div className="p-3 flex-1 overflow-y-auto space-y-2.5">
+                  {col.id === 'todo' && isAddingCard && (
+                    <div className="p-3 rounded-lg border border-emerald-500/40 bg-[#171d2b] space-y-2.5 shadow-lg">
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder={t('board.cardTitlePlaceholder')}
+                        value={newCardTitle}
+                        onChange={(e) => setNewCardTitle(e.target.value)}
+                        onKeyDown={async (e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            await handleCreateCardSubmit();
+                          } else if (e.key === 'Escape') {
+                            setIsAddingCard(false);
+                            setNewCardTitle('');
+                          }
+                        }}
+                        className="w-full bg-[#0d1017] border border-[#202738] rounded-md px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingCard(false);
+                            setNewCardTitle('');
+                          }}
+                          className="px-2.5 py-1 text-[11px] text-slate-400 hover:text-slate-200 rounded hover:bg-[#202636] transition"
+                        >
+                          {t('common.cancel')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCreateCardSubmit}
+                          disabled={!newCardTitle.trim() || isSubmittingCard}
+                          className="px-3 py-1 text-[11px] bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-slate-950 font-bold rounded transition"
+                        >
+                          {isSubmittingCard ? t('common.loading') : t('common.confirm')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {colCards.map((card) => {
                     const checklistDone = card.checklist.filter((s) => s.checked).length;
                     const checklistTotal = card.checklist.length;
@@ -98,13 +171,13 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
                               e.stopPropagation();
                               onOpenTest(card.card_id);
                             }}
-                            className="mt-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] flex items-center justify-between hover:bg-amber-500/20 transition"
+                            className="mt-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] flex items-center justify-between hover:bg-amber-500/20 transition gap-2"
                           >
-                            <span className="flex items-center gap-1.5 font-medium">
-                              <ListChecks size={13} />
-                              <span>{t('board.checklistProgress', { done: checklistDone, total: checklistTotal })}</span>
+                            <span className="flex items-center gap-1.5 font-medium truncate min-w-0">
+                              <ListChecks size={13} className="shrink-0" />
+                              <span className="truncate">{t('board.checklistProgress', { done: checklistDone, total: checklistTotal })}</span>
                             </span>
-                            <span className="text-[10px] font-semibold text-amber-400 flex items-center gap-0.5">
+                            <span className="text-[10px] font-semibold text-amber-400 flex items-center gap-0.5 shrink-0 whitespace-nowrap">
                               {t('board.goToTest')} <ArrowRight size={11} />
                             </span>
                           </div>
@@ -174,9 +247,9 @@ export const BoardView: React.FC<BoardViewProps> = ({ cards, onMoveCard, onOpenT
         </div>
       </div>
 
-      {/* 420px Slide-Out Detail Drawer */}
+      {/* Slide-Out Detail Drawer */}
       {selectedCard && (
-        <div className="w-[420px] bg-[#12151d] border-l border-[#1e2330] flex flex-col shrink-0 shadow-2xl z-20 overflow-hidden animate-in slide-in-from-right duration-200">
+        <div className="w-full max-w-[380px] sm:w-[380px] md:w-[400px] bg-[#12151d] border-l border-[#1e2330] flex flex-col shrink-0 shadow-2xl z-20 overflow-hidden animate-in slide-in-from-right duration-200">
           <div className="p-4 border-b border-[#1e2330] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs text-amber-400 font-bold">

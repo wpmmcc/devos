@@ -44,12 +44,19 @@ pub struct SmokeTestConfig {
     pub command: String,
 }
 
+fn default_env() -> String {
+    "script".to_string()
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, TS)]
 #[ts(export)]
 pub struct RunTarget {
     pub id: String,
+    #[serde(alias = "name")]
     pub label: String,
+    #[serde(default)]
     pub description: String,
+    #[serde(default = "default_env")]
     pub env: String,
     pub command: String,
     #[serde(default = "default_timeout")]

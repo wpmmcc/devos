@@ -50,31 +50,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t } = useTranslation();
 
   return (
-    <aside className="w-[220px] bg-[#12151d] border-r border-[#1e2330] flex flex-col justify-between shrink-0 h-screen select-none">
+    <aside className="w-[220px] bg-[#12151d] border-r border-[#1e2330] flex flex-col shrink-0 h-screen select-none">
       {/* Brand Header */}
-      <div>
-        <div className="h-[52px] flex items-center px-4 border-b border-[#1e2330] gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-bold text-emerald-400 text-sm">
-            D
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-slate-100 tracking-wide text-sm">DevOS</span>
-            <span className="text-[9px] text-slate-500">{t('sidebar.brandSubtitle')}</span>
-          </div>
+      <div className="h-[52px] shrink-0 flex items-center px-4 border-b border-[#1e2330] gap-2.5">
+        <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-bold text-emerald-400 text-sm">
+          D
         </div>
+        <div className="flex flex-col">
+          <span className="font-semibold text-slate-100 tracking-wide text-sm">DevOS</span>
+          <span className="text-[9px] text-slate-500">{t('sidebar.brandSubtitle')}</span>
+        </div>
+      </div>
 
-        {/* Project Section */}
-        <div className="p-3">
-          <div className="flex items-center justify-between text-xs text-slate-400 px-2 mb-2 font-medium">
-            <span>{t('sidebar.myProjects')}</span>
-            <button
-              onClick={onOpenNewProject}
-              className="p-1 hover:text-emerald-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
-              title={t('sidebar.newProject')}
-            >
-              <Plus size={14} />
-            </button>
-          </div>
+      {/* Project Section (Scrollable min-h-0) */}
+      <div className="flex-1 overflow-y-auto min-h-0 p-3 space-y-1">
+        <div className="flex items-center justify-between text-xs text-slate-400 px-2 mb-2 font-medium">
+          <span>{t('sidebar.myProjects')}</span>
+          <button
+            onClick={onOpenNewProject}
+            className="p-1 hover:text-emerald-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
+            title={t('sidebar.newProject')}
+          >
+            <Plus size={14} />
+          </button>
+        </div>
 
           <div className="space-y-1">
             {recentProjects.map((p) => {
@@ -194,11 +193,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
           </div>
-        </div>
       </div>
 
       {/* Running Environments Resource Capsule */}
-      <div className="px-3 pt-3 border-t border-[#1e2330]">
+      <div className="shrink-0 px-3 pt-2.5 pb-2 border-t border-[#1e2330]">
         <div className="px-2.5 py-1.5 bg-[#161a25] rounded-lg border border-[#232938] flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5 text-slate-300">
             <span
@@ -225,7 +223,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Bottom Utility Tools */}
-      <div className="p-3 border-t border-[#1e2330] space-y-1">
+      <div className="shrink-0 p-3 pt-2 border-t border-[#1e2330] space-y-1">
         <button
           onClick={() => {
             if (onOpenAgentConnect) {

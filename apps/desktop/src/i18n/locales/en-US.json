@@ -54,10 +54,10 @@
     "modeLocalDev": "Dev Local ({{mode}})",
     "modeContent": "Content Local ({{mode}})",
     "modeProd": "Protected Prod ({{mode}})",
-    "tabBoard": "Board & Progress",
+    "tabBoard": "Board",
     "tabTest": "Test & Preview",
-    "tabIssues": "Issue Feedback",
-    "tabAssets": "Assets & Standards",
+    "tabIssues": "Issues",
+    "tabAssets": "Assets",
     "webRunning": "Web Container Running",
     "webStopped": "Web Container Stopped",
     "scriptReady": "Script Engine Ready",
@@ -76,6 +76,8 @@
     "logs": "Logs"
   },
   "board": {
+    "addCard": "New Task Card",
+    "cardTitlePlaceholder": "Enter task card title (Press Enter to create)...",
     "todo": "Todo",
     "doing": "In Progress",
     "testing": "Testing",
@@ -331,6 +333,7 @@
     }
   },
   "toast": {
+    "cardCreated": "New task card created successfully!",
     "issueCreated": "Packaged error and screenshots ({{id}}). Click \"Copy Command\" and paste into your AI assistant to fix.",
     "copyInstruction": "Copy Command",
     "cardMoved": "Card moved to \"{{col}}\"",
