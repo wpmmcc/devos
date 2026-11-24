@@ -70,6 +70,7 @@ export const App: React.FC = () => {
     setIsEnvBusy(true);
     const targetPath = currentProjectPathRef.current || currentProjectPath || project.slug;
     if (isEnvRunning) {
+      addToast('info', t('toast.envStopping'));
       const res = await Bridge.stopEnv(targetPath, 'auto');
       if (res.ok) {
         setIsEnvRunning(false);
@@ -78,6 +79,7 @@ export const App: React.FC = () => {
         addToast('error', res.error.plain_message || res.error.message);
       }
     } else {
+      addToast('info', t('toast.envStarting'));
       const res = await Bridge.startEnv(targetPath, 'auto');
       if (res.ok) {
         setIsEnvRunning(true);

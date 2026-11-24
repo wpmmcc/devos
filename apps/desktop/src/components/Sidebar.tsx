@@ -19,6 +19,7 @@ import {
   RotateCcw,
   Camera,
   Languages,
+  Loader2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DevosProject, RecentProjectDto } from '../types';
@@ -104,13 +105,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex items-center justify-between text-xs text-slate-400 px-1 font-medium">
           <span className="font-semibold text-slate-300">{t('sidebar.myProjects')}</span>
           <div className="flex items-center gap-0.5">
-            <button
-              onClick={onOpenTrashViewer}
-              className="p-1 hover:text-rose-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
-              title="项目回收站 (Project Trash): 查看归档、一键恢复或彻底粉碎"
-            >
-              <Trash2 size={13} />
-            </button>
             <button
               onClick={onOpenNewProject}
               className="p-1 hover:text-emerald-400 hover:bg-[#1a1f2c] rounded transition text-slate-400"
@@ -345,7 +339,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 : '启动环境: 启动当前项目的本地开发容器'
                             }
                           >
-                            {isEnvRunning ? (
+                            {isEnvBusy ? (
+                              <>
+                                <Loader2 size={11} className="animate-spin text-cyan-400" />
+                                <span className="text-cyan-300">
+                                  {isEnvRunning ? t('sidebar.stoppingEnv') : t('sidebar.startingEnv')}
+                                </span>
+                              </>
+                            ) : isEnvRunning ? (
                               <>
                                 <Square size={11} />
                                 <span>{t('sidebar.stopEnv')}</span>
@@ -506,6 +507,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Radio size={13} className="text-amber-400" />
             <span>{t('sidebar.conflictDoctor')}</span>
+          </button>
+        )}
+
+        {/* Project Trash */}
+        {onOpenTrashViewer && (
+          <button
+            onClick={onOpenTrashViewer}
+            className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-300 hover:text-slate-100 hover:bg-[#1a1f2c] rounded-lg transition"
+            title="项目回收站 (Project Trash): 查看已归档项目、一键安全恢复或彻底粉碎"
+          >
+            <span className="flex items-center gap-2">
+              <Trash2 size={13} className="text-rose-400" />
+              <span>{t('sidebar.projectTrash')}</span>
+            </span>
+            <span className="text-[9px] text-rose-400 bg-rose-950/40 px-1 py-0.5 rounded border border-rose-800/40 font-mono">
+              Trash
+            </span>
           </button>
         )}
 

@@ -42,11 +42,14 @@
     "assets": "Assets",
     "startEnv": "Start Env",
     "stopEnv": "Stop Env",
+    "startingEnv": "Starting...",
+    "stoppingEnv": "Stopping...",
     "restartEnv": "Restart Env",
     "snapshot": "Snapshot",
     "timeMachine": "Time Machine",
     "logs": "Logs",
     "switchLang": "Language",
+    "projectTrash": "Project Trash",
     "finder": "Finder",
     "terminal": "Terminal",
     "editor": "Code",
@@ -357,6 +360,8 @@
     "copyInstruction": "Copy Command",
     "cardMoved": "Card moved to \"{{col}}\"",
     "envStarted": "Managed environment started successfully!",
-    "envStopped": "Environment stopped safely. Ports and memory released."
+    "envStopped": "Environment stopped safely. Ports and memory released.",
+    "envStarting": "Starting local dev container and runtime...",
+    "envStopping": "Stopping environment container and releasing resources..."
   }
 }

@@ -19,7 +19,8 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 struct ActiveWatcherState(Mutex<Option<ProjectWatcher>>);
-struct ActiveEnvLocks(Mutex<HashSet<PathBuf>>);
+#[derive(Clone)]
+struct ActiveEnvLocks(std::sync::Arc<Mutex<HashSet<PathBuf>>>);
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct RecentProjectDto {
@@ -98,14 +99,18 @@ fn get_env_driver(target: &str, project_type: &ProjectType) -> Box<dyn EnvDriver
 }
 
 #[tauri::command]
-fn run_preflight_doctor() -> ApiResponse<Vec<DiagnosticItem>> {
-    let diags = PreflightDoctor::diagnose_all();
+async fn run_preflight_doctor() -> ApiResponse<Vec<DiagnosticItem>> {
+    let diags = tokio::task::spawn_blocking(PreflightDoctor::diagnose_all)
+        .await
+        .unwrap_or_default();
     ApiResponse::success(diags)
 }
 
 #[tauri::command]
-fn auto_fix_environment() -> ApiResponse<Vec<DiagnosticItem>> {
-    let diags = PreflightDoctor::auto_fix_all();
+async fn auto_fix_environment() -> ApiResponse<Vec<DiagnosticItem>> {
+    let diags = tokio::task::spawn_blocking(PreflightDoctor::auto_fix_all)
+        .await
+        .unwrap_or_default();
     ApiResponse::success(diags)
 }
 
@@ -536,7 +541,7 @@ fn execute_script_target(
 }
 
 fn with_env_lock<F, R>(
-    locks_state: &State<'_, ActiveEnvLocks>,
+    locks_arc: &std::sync::Arc<Mutex<HashSet<PathBuf>>>,
     project_root: &Path,
     f: F,
 ) -> Result<R>
@@ -547,7 +552,12 @@ where
         .canonicalize()
         .unwrap_or_else(|_| project_root.to_path_buf());
     {
-        let mut locks = locks_state.0.lock().unwrap();
+        let mut locks = locks_arc.lock().map_err(|_| DevosError::Custom {
+            code: "LOCK_ERROR".to_string(),
+            message: "Failed to acquire lock state".to_string(),
+            hint: None,
+            plain_message: Some("无法获取操作锁状态".to_string()),
+        })?;
         if locks.contains(&canonical) {
             return Err(DevosError::Custom {
                 code: "ENV_BUSY".to_string(),
@@ -566,7 +576,7 @@ where
 
     let res = f();
 
-    if let Ok(mut locks) = locks_state.0.lock() {
+    if let Ok(mut locks) = locks_arc.lock() {
         locks.remove(&canonical);
     }
 
@@ -574,85 +584,138 @@ where
 }
 
 #[tauri::command]
-fn get_env_status(project_path: String, target: String) -> ApiResponse<EnvStatus> {
-    let res = (|| -> Result<EnvStatus> {
+async fn get_env_status(project_path: String, target: String) -> ApiResponse<EnvStatus> {
+    let res = tokio::task::spawn_blocking(move || -> Result<EnvStatus> {
         let (root, project) = load_project_safe(&project_path)?;
         let driver = get_env_driver(&target, &project.project_type);
         driver.status(&root)
-    })();
+    })
+    .await
+    .unwrap_or_else(|e| {
+        Err(DevosError::Custom {
+            code: "TASK_JOIN_ERROR".to_string(),
+            message: format!("Task failed: {}", e),
+            hint: None,
+            plain_message: Some("后台任务调度异常".to_string()),
+        })
+    });
     to_api_resp(res)
 }
 
 #[tauri::command]
-fn start_environment(
-    env_locks: State<'_, ActiveEnvLocks>,
+async fn start_environment(
+    app: AppHandle,
     project_path: String,
     target: String,
 ) -> ApiResponse<EnvStatus> {
-    let res = (|| -> Result<EnvStatus> {
+    let env_locks = app.state::<ActiveEnvLocks>();
+    let locks_arc = env_locks.0.clone();
+    let res = tokio::task::spawn_blocking(move || -> Result<EnvStatus> {
         let (root, project) = load_project_safe(&project_path)?;
-        with_env_lock(&env_locks, &root, || {
+        with_env_lock(&locks_arc, &root, || {
             let driver = get_env_driver(&target, &project.project_type);
             driver.up(&root)
         })
-    })();
+    })
+    .await
+    .unwrap_or_else(|e| {
+        Err(DevosError::Custom {
+            code: "TASK_JOIN_ERROR".to_string(),
+            message: format!("Task failed: {}", e),
+            hint: None,
+            plain_message: Some("后台任务调度异常".to_string()),
+        })
+    });
     to_api_resp(res)
 }
 
 #[tauri::command]
-fn stop_environment(
-    env_locks: State<'_, ActiveEnvLocks>,
+async fn stop_environment(
+    app: AppHandle,
     project_path: String,
     target: String,
 ) -> ApiResponse<bool> {
-    let res = (|| -> Result<bool> {
+    let env_locks = app.state::<ActiveEnvLocks>();
+    let locks_arc = env_locks.0.clone();
+    let res = tokio::task::spawn_blocking(move || -> Result<bool> {
         let (root, project) = load_project_safe(&project_path)?;
-        with_env_lock(&env_locks, &root, || {
+        with_env_lock(&locks_arc, &root, || {
             let driver = get_env_driver(&target, &project.project_type);
             driver.down(&root)?;
             Ok(true)
         })
-    })();
+    })
+    .await
+    .unwrap_or_else(|e| {
+        Err(DevosError::Custom {
+            code: "TASK_JOIN_ERROR".to_string(),
+            message: format!("Task failed: {}", e),
+            hint: None,
+            plain_message: Some("后台任务调度异常".to_string()),
+        })
+    });
     to_api_resp(res)
 }
 
 #[tauri::command]
-fn create_snapshot(
-    env_locks: State<'_, ActiveEnvLocks>,
+async fn create_snapshot(
+    app: AppHandle,
     project_path: String,
     name: String,
 ) -> ApiResponse<String> {
-    let res = (|| -> Result<String> {
+    let env_locks = app.state::<ActiveEnvLocks>();
+    let locks_arc = env_locks.0.clone();
+    let res = tokio::task::spawn_blocking(move || -> Result<String> {
         let (root, project) = load_project_safe(&project_path)?;
         let snap_name = if name.trim().is_empty() {
             format!("snap_{}", chrono::Utc::now().format("%Y%m%d_%H%M%S"))
         } else {
             name.trim().to_string()
         };
-        with_env_lock(&env_locks, &root, || {
+        with_env_lock(&locks_arc, &root, || {
             let driver = get_env_driver("auto", &project.project_type);
             driver.snapshot(&root, &snap_name)?;
             Ok(snap_name)
         })
-    })();
+    })
+    .await
+    .unwrap_or_else(|e| {
+        Err(DevosError::Custom {
+            code: "TASK_JOIN_ERROR".to_string(),
+            message: format!("Task failed: {}", e),
+            hint: None,
+            plain_message: Some("后台任务调度异常".to_string()),
+        })
+    });
     to_api_resp(res)
 }
 
 #[tauri::command]
-fn restore_snapshot(
-    env_locks: State<'_, ActiveEnvLocks>,
+async fn restore_snapshot(
+    app: AppHandle,
     project_path: String,
     name: String,
 ) -> ApiResponse<String> {
-    let res = (|| -> Result<String> {
+    let env_locks = app.state::<ActiveEnvLocks>();
+    let locks_arc = env_locks.0.clone();
+    let res = tokio::task::spawn_blocking(move || -> Result<String> {
         let (root, project) = load_project_safe(&project_path)?;
         Guardrails::check_destructive_allowed(&project, "restore")?;
-        with_env_lock(&env_locks, &root, || {
+        with_env_lock(&locks_arc, &root, || {
             let driver = get_env_driver("auto", &project.project_type);
             driver.restore(&root, &name)?;
             Ok(name)
         })
-    })();
+    })
+    .await
+    .unwrap_or_else(|e| {
+        Err(DevosError::Custom {
+            code: "TASK_JOIN_ERROR".to_string(),
+            message: format!("Task failed: {}", e),
+            hint: None,
+            plain_message: Some("后台任务调度异常".to_string()),
+        })
+    });
     to_api_resp(res)
 }
 
@@ -1178,7 +1241,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .manage(ActiveWatcherState(Mutex::new(None)))
-        .manage(ActiveEnvLocks(Mutex::new(HashSet::new())))
+        .manage(ActiveEnvLocks(std::sync::Arc::new(Mutex::new(HashSet::new()))))
         .invoke_handler(tauri::generate_handler![
             run_preflight_doctor,
             auto_fix_environment,

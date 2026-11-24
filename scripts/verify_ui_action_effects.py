@@ -105,20 +105,20 @@ def screenshot(name):
     return path
 
 def get_element_pos(selector_type, match_text):
-    """Finds position of UI element by name, title, or value."""
+    """Finds position of UI element by name, title, or value with multi-level group search."""
     script = f'''
     tell application "DevOS" to activate
     delay 0.1
     tell application "System Events"
         tell process "devos-desktop"
             set web to UI element 1 of scroll area 1 of group 1 of group 1 of window 1
-            -- search buttons in web
+            -- search buttons directly in web
             repeat with aBtn in (every button of web)
                 if (name of aBtn contains "{match_text}") or (title of aBtn contains "{match_text}") or (help of aBtn contains "{match_text}") then
                     return (get position of aBtn)
                 end if
             end repeat
-            -- search groups
+            -- search groups level 1
             repeat with aGroup in (every group of web)
                 repeat with aBtn in (every button of aGroup)
                     if (name of aBtn contains "{match_text}") or (title of aBtn contains "{match_text}") or (help of aBtn contains "{match_text}") then
@@ -129,6 +129,32 @@ def get_element_pos(selector_type, match_text):
                     if (value of anItem contains "{match_text}") then
                         return (get position of anItem)
                     end if
+                end repeat
+                -- search groups level 2 (modals / drawers)
+                repeat with subGroup in (every group of aGroup)
+                    repeat with aBtn in (every button of subGroup)
+                        if (name of aBtn contains "{match_text}") or (title of aBtn contains "{match_text}") or (help of aBtn contains "{match_text}") then
+                            return (get position of aBtn)
+                        end if
+                    end repeat
+                    repeat with anItem in (every static text of subGroup)
+                        if (value of anItem contains "{match_text}") then
+                            return (get position of anItem)
+                        end if
+                    end repeat
+                    -- search groups level 3 (deep modals)
+                    repeat with subGroup2 in (every group of subGroup)
+                        repeat with aBtn in (every button of subGroup2)
+                            if (name of aBtn contains "{match_text}") or (title of aBtn contains "{match_text}") or (help of aBtn contains "{match_text}") then
+                                return (get position of aBtn)
+                            end if
+                        end repeat
+                        repeat with anItem in (every static text of subGroup2)
+                            if (value of anItem contains "{match_text}") then
+                                return (get position of anItem)
+                            end if
+                        end repeat
+                    end repeat
                 end repeat
             end repeat
         end tell
@@ -222,7 +248,7 @@ def main():
         # Currently stopped, let's start it first to test stop
         print("  -> Currently stopped, clicking '启动环境' first...")
         native_click(pos_start[0] + 15, pos_start[1] + 10)
-        for _ in range(10):
+        for _ in range(15):
             time.sleep(1.0)
             if get_element_pos("button", "停止环境"):
                 break
@@ -231,7 +257,7 @@ def main():
     # Now click "停止环境"
     print("  -> Clicking '停止环境'...")
     clicked_stop = click_element_by_text("停止环境", offset_x=20, offset_y=10)
-    for _ in range(8):
+    for _ in range(15):
         time.sleep(1.0)
         if get_element_pos("button", "启动环境"):
             break
@@ -369,6 +395,9 @@ def main():
     screenshot("09a_trash_confirm_modal")
     # Cancel without removing
     clicked_cancel = click_element_by_text("取消", offset_x=15, offset_y=10)
+    if not clicked_cancel:
+        press_esc()
+        clicked_cancel = True
     time.sleep(0.5)
     screenshot("09b_trash_cancelled")
 

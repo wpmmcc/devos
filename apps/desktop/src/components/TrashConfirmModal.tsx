@@ -19,6 +19,16 @@ export const TrashConfirmModal: React.FC<TrashConfirmModalProps> = ({
   const { t } = useTranslation();
   const [isDeleting, setIsDeleting] = useState(false);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen || !project) return null;
 
   const handleConfirm = async () => {
