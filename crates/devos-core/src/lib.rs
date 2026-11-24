@@ -35,7 +35,10 @@ pub use fs_utils::{
 pub use guardrail::Guardrails;
 pub use issue::IssueManager;
 pub use logging::{
-    export_diagnostic_bundle, get_runtime_logs, log_runtime_line, sanitize_text, DiagnosticBundle,
+    clear_logs, export_diagnostic_bundle, format_untrusted_log_excerpt, get_logs,
+    get_runtime_logs, log_debug, log_entry, log_error, log_info, log_runtime_line, log_warn,
+    sanitize_text, DiagnosticBundle, LogEntry, LogFilter, LogLevel, LogSource, RingBufferLogger,
+    RollingFileLogger, MAX_LOG_FILE_BYTES, MAX_RING_BUFFER_ENTRIES,
 };
 pub use mirror::{DownloadProgress, MirrorManager, MirrorPreset, MirrorRaceResult, MirrorsConfig};
 pub use port::{PortAllocation, PortOccupant, PortRegistry};

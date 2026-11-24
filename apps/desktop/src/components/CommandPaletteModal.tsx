@@ -14,6 +14,7 @@ import {
   Stethoscope,
   Radio,
   Settings,
+  Terminal,
   X,
   ArrowRight,
 } from 'lucide-react';
@@ -31,6 +32,7 @@ interface CommandPaletteModalProps {
   onOpenDoctor: () => void;
   onOpenConflictDoctor: () => void;
   onOpenSettings: () => void;
+  onOpenLogs?: () => void;
   isEnvRunning: boolean;
 }
 
@@ -54,6 +56,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onOpenDoctor,
   onOpenConflictDoctor,
   onOpenSettings,
+  onOpenLogs,
   isEnvRunning,
 }) => {
   const { t } = useTranslation();
@@ -154,6 +157,13 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       titleKey: 'modals.commandPalette.toolSettings',
       icon: <Settings size={15} className="text-slate-400" />,
       action: onOpenSettings,
+    },
+    {
+      id: 'tool-logs',
+      group: 'groupTools',
+      titleKey: 'modals.commandPalette.toolLogs',
+      icon: <Terminal size={15} className="text-emerald-400" />,
+      action: onOpenLogs || (() => {}),
     },
   ];
 

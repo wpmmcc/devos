@@ -72,7 +72,8 @@
     "undoSuccess": "Restored to previous code snapshot! Workspace cleanly restored.",
     "bgTaskRunning": "Background Task Running",
     "openInAgent": "Open in Agent",
-    "cmdKHint": "Press Cmd+K for quick search and actions"
+    "cmdKHint": "Press Cmd+K for quick search and actions",
+    "logs": "Logs"
   },
   "board": {
     "todo": "Todo",
@@ -242,7 +243,8 @@
       "exportDiagBtn": "Export Diagnostic Bundle (.zip)",
       "versionInfo": "Current Version: v{{version}}",
       "checkUpdate": "Check for Updates",
-      "upToDate": "You are on the latest version"
+      "upToDate": "You are on the latest version",
+      "openLogViewerBtn": "Open Live Log Viewer"
     },
     "commandPalette": {
       "placeholder": "Type a command or search action (e.g. switch project, start env, doctor, time machine)...",
@@ -261,7 +263,38 @@
       "toolDoctor": "Open Preflight Doctor",
       "toolConflict": "Open Port Conflict Doctor",
       "toolSettings": "Open Preferences & Diagnostics",
-      "noResults": "No matching commands found"
+      "noResults": "No matching commands found",
+      "toolLogs": "View Runtime & Environment Logs"
+    },
+    "logs": {
+      "title": "Runtime & Environment Logs",
+      "subtitle": "Low-noise structured log stream & diagnostics (OrbStack / Docker Desktop benchmark)",
+      "entries": "entries",
+      "errors": "errors",
+      "exportBtn": "Export Diagnostic Bundle",
+      "exportTooltip": "Export sanitized system & environment diagnostic bundle",
+      "exportSuccess": "Diagnostic bundle exported to: {{path}}",
+      "copyBtn": "Copy Logs",
+      "copied": "Copied",
+      "copyTooltip": "Copy all currently filtered logs to clipboard",
+      "clearBtn": "Clear Buffer",
+      "clearTooltip": "Clear in-memory ring buffer",
+      "tabSystem": "System & Core",
+      "tabContainer": "Container (Docker/DDEV)",
+      "sourceAll": "All Sources",
+      "sourceCore": "DevOS Core",
+      "sourceEnv": "Containers",
+      "sourceRunner": "Task Runner",
+      "sourceProbe": "Web Probe",
+      "sourceDeploy": "Deploy Plugins",
+      "searchPlaceholder": "Search logs / module...",
+      "autoScroll": "Auto Scroll",
+      "autoScrollOn": "Auto-scroll to bottom active",
+      "autoScrollOff": "Auto-scroll paused",
+      "noLogs": "No system logs matching current filters",
+      "noContainerLogs": "Container is stopped or has no output",
+      "memoryLimitHint": "Memory backpressure: max 2,000 recent records in memory",
+      "diskLimitHint": "Disk rotation: 10 MB per file rolling cap"
     }
   },
   "toast": {

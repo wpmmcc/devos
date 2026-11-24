@@ -60,4 +60,5 @@ pub trait EnvDriver: Send + Sync {
     ) -> Result<ExecResult>;
     fn snapshot(&self, project_root: &Path, name: &str) -> Result<()>;
     fn restore(&self, project_root: &Path, name: &str) -> Result<()>;
+    fn logs(&self, project_root: &Path, tail: usize) -> Result<Vec<String>>;
 }

@@ -1,7 +1,9 @@
 use clap::{Parser, Subcommand};
 use devos_core::{BoardManager, Database, DevosError, IssueManager, ProjectManager, Result};
 use devos_env::{DdevDriver, DevcontainerDriver, EnvDriver, PreflightDoctor};
-use devos_schema::{ApiResponse, BoardColumn, DevosProject, ProjectType};
+use devos_schema::{
+    ApiResponse, BoardColumn, DevosProject, LogFilter, LogLevel, LogSource, ProjectType,
+};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -183,6 +185,20 @@ enum Commands {
         version: Option<String>,
         #[arg(long)]
         path: Option<PathBuf>,
+    },
+
+    /// View, query, and manage structured runtime and environment logs
+    Logs {
+        #[arg(long, short = 'l')]
+        level: Option<String>, // debug, info, warn, error
+        #[arg(long, short = 's')]
+        source: Option<String>, // core, env, runner, probe, deploy, all
+        #[arg(long, short = 'n', default_value = "50")]
+        lines: usize,
+        #[arg(long, short = 'q')]
+        query: Option<String>,
+        #[arg(long)]
+        clear: bool,
     },
 }
 
@@ -612,11 +628,19 @@ async fn main() {
         }
 
         Commands::Doctor { fix } => {
+            devos_core::log_info(
+                LogSource::Core,
+                format!("Preflight doctor check started (fix_mode={})", fix),
+            );
             let diags = if fix {
                 PreflightDoctor::auto_fix_all()
             } else {
                 PreflightDoctor::diagnose_all()
             };
+            devos_core::log_info(
+                LogSource::Core,
+                format!("Preflight doctor finished with {} diagnosis items", diags.len()),
+            );
             print_result(json_mode, Ok(diags));
         }
 
@@ -854,6 +878,57 @@ async fn main() {
                 }
             })();
             print_result(json_mode, res);
+        }
+        Commands::Logs {
+            level,
+            source,
+            lines,
+            query,
+            clear,
+        } => {
+            if clear {
+                devos_core::clear_logs();
+                if json_mode {
+                    println!("{}", serde_json::to_string_pretty(&ApiResponse::success(true)).unwrap());
+                } else {
+                    println!("In-memory log buffer cleared.");
+                }
+                return;
+            }
+
+            let min_level = level.as_deref().and_then(|l| l.parse::<LogLevel>().ok());
+            let source_filter = source.as_deref().and_then(|s| s.parse::<LogSource>().ok());
+
+            let filter = LogFilter {
+                min_level,
+                source: source_filter,
+                query,
+                limit: Some(lines),
+            };
+
+            let entries = devos_core::get_logs(&filter);
+            if json_mode {
+                println!("{}", serde_json::to_string_pretty(&ApiResponse::success(entries)).unwrap());
+            } else if entries.is_empty() {
+                println!("No logs found matching current filter.");
+            } else {
+                for e in entries {
+                    let level_badge = match e.level {
+                        LogLevel::Error => "[ERROR]",
+                        LogLevel::Warn => "[WARN] ",
+                        LogLevel::Info => "[INFO] ",
+                        LogLevel::Debug => "[DEBUG]",
+                    };
+                    println!(
+                        "{} {} [{}] {}{}",
+                        e.timestamp,
+                        level_badge,
+                        e.source,
+                        e.message,
+                        e.project_slug.map(|s| format!(" (project={})", s)).unwrap_or_default()
+                    );
+                }
+            }
         }
     }
 }

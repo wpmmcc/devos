@@ -3,6 +3,7 @@ import {
   Play,
   Square,
   Camera,
+  Terminal,
   TerminalSquare,
   Cpu,
   Languages,
@@ -25,6 +26,7 @@ interface TopBarProps {
   onOpenCommandPalette?: () => void;
   onOpenSettings?: () => void;
   onOpenTimeMachine?: () => void;
+  onOpenLogs?: () => void;
   onShowToast?: (type: 'success' | 'info' | 'warning' | 'error', msg: string) => void;
 }
 
@@ -37,6 +39,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenCommandPalette,
   onOpenSettings,
   onOpenTimeMachine,
+  onOpenLogs,
   onShowToast,
 }) => {
   const { t, i18n } = useTranslation();
@@ -283,6 +286,18 @@ export const TopBar: React.FC<TopBarProps> = ({
           <Languages size={12} className="text-cyan-400" />
           <span>{i18n.language.startsWith('zh') ? 'EN' : '中'}</span>
         </button>
+
+        {/* Logs Button */}
+        {onOpenLogs && (
+          <button
+            onClick={onOpenLogs}
+            className="flex items-center gap-1.5 px-2.5 py-1.2 rounded-md text-xs font-medium bg-[#1e2330] hover:bg-[#282f42] text-slate-300 hover:text-white transition border border-[#2c3346]"
+            title={t('topbar.logs')}
+          >
+            <Terminal size={13} className="text-emerald-400" />
+            <span>{t('topbar.logs')}</span>
+          </button>
+        )}
 
         {/* Settings Button */}
         {onOpenSettings && (

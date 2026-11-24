@@ -201,4 +201,39 @@ impl EnvDriver for DevcontainerDriver {
     fn restore(&self, _project_root: &Path, _name: &str) -> Result<()> {
         Ok(())
     }
+
+    fn logs(&self, _project_root: &Path, tail: usize) -> Result<Vec<String>> {
+        let tail_str = tail.to_string();
+
+        // Try querying docker logs for container
+        let mut cmd = Command::new("docker");
+        cmd.args(["ps", "-q", "--filter", "label=com.devos.managed=true"]);
+        inject_proxy_bypass_env(&mut cmd);
+
+        if let Ok(output) = cmd.output() {
+            let ids = String::from_utf8_lossy(&output.stdout);
+            if let Some(id) = ids.lines().next() {
+                let id = id.trim();
+                if !id.is_empty() {
+                    let mut log_cmd = Command::new("docker");
+                    log_cmd.args(["logs", "--tail", &tail_str, id]);
+                    inject_proxy_bypass_env(&mut log_cmd);
+                    if let Ok(log_output) = log_cmd.output() {
+                        let combined = format!(
+                            "{}\n{}",
+                            String::from_utf8_lossy(&log_output.stdout),
+                            String::from_utf8_lossy(&log_output.stderr)
+                        );
+                        let lines: Vec<String> = combined
+                            .lines()
+                            .map(|l| l.trim().to_string())
+                            .filter(|l| !l.is_empty())
+                            .collect();
+                        return Ok(lines);
+                    }
+                }
+            }
+        }
+        Ok(vec![])
+    }
 }

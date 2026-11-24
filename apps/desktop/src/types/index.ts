@@ -228,3 +228,24 @@ export interface ApiResponse<T> {
     plain_message?: string;
   };
 }
+
+export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+export type LogSource = 'all' | 'core' | 'env' | 'runner' | 'probe' | 'deploy';
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  level: LogLevel;
+  source: LogSource;
+  message: string;
+  target?: string;
+  project_slug?: string;
+}
+
+export interface LogFilter {
+  min_level?: LogLevel;
+  source?: LogSource;
+  query?: string;
+  limit?: number;
+}
+

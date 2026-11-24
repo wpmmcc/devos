@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Globe, Shield, Download, RefreshCw, X, Check, Laptop, Moon, Sun, ArrowUpRight } from 'lucide-react';
+import { Settings, Globe, Shield, Download, RefreshCw, X, Check, Laptop, Moon, Sun, ArrowUpRight, Terminal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { switchLanguage } from '../i18n';
 import { Bridge } from '../services/tauriBridge';
@@ -7,9 +7,10 @@ import { Bridge } from '../services/tauriBridge';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenLogs?: () => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onOpenLogs }) => {
   const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState<'general' | 'diagnostics' | 'about'>('general');
   const [theme, setTheme] = useState<'system' | 'dark' | 'light'>('dark');
@@ -214,6 +215,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 <Download size={14} />
                 <span>{isExporting ? t('common.loading') : t('modals.settings.exportDiagBtn')}</span>
               </button>
+
+              {onOpenLogs && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenLogs();
+                  }}
+                  className="w-full py-2.5 bg-[#1e2433] hover:bg-[#283144] text-slate-200 border border-[#2d374d] rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+                >
+                  <Terminal size={14} className="text-emerald-400" />
+                  <span>{t('modals.settings.openLogViewerBtn')}</span>
+                </button>
+              )}
             </div>
           )}
 

@@ -1,4 +1,14 @@
-import { ApiResponse, BoardCard, DevosProject, DiagnosticItem, Issue, RunManifest, ScriptContext } from '../types';
+import {
+  ApiResponse,
+  BoardCard,
+  DevosProject,
+  DiagnosticItem,
+  Issue,
+  LogEntry,
+  LogFilter,
+  RunManifest,
+  ScriptContext,
+} from '../types';
 
 declare global {
   interface Window {
@@ -170,6 +180,18 @@ export const Bridge = {
 
   exportDiagnosticBundle: (projectPath?: string) =>
     invokeTauri<string>('export_diagnostic_bundle', { projectPath }),
+
+  getLogs: (filter?: LogFilter) =>
+    invokeTauri<LogEntry[]>('get_logs', { filter }),
+
+  clearLogs: () =>
+    invokeTauri<boolean>('clear_logs'),
+
+  appendLog: (level: string, source: string, message: string, projectSlug?: string) =>
+    invokeTauri<boolean>('append_log', { level, source, message, projectSlug }),
+
+  getContainerLogs: (projectPath: string, tail?: number) =>
+    invokeTauri<string[]>('get_container_logs', { projectPath, tail }),
 
   exportReleaseBundle: (projectPath: string, version: string, panelFriendly: boolean) =>
     invokeTauri<any>('export_release_bundle', { projectPath, version, panelFriendly }),
@@ -552,6 +574,42 @@ function mockHandler<T>(cmd: string, args: Record<string, any>): ApiResponse<T> 
         deployed_version: args.version || 'v0.9.0',
         sanitized_log: `Rolled back to previous version ${args.version || 'v0.9.0'}.`,
       } as any,
+    };
+  }
+
+  if (cmd === 'get_logs') {
+    return {
+      ok: true,
+      data: [
+        {
+          id: 'log_mock_1',
+          timestamp: new Date().toISOString(),
+          level: 'INFO',
+          source: 'core',
+          message: 'DevOS workbench core initialized successfully.',
+        },
+        {
+          id: 'log_mock_2',
+          timestamp: new Date().toISOString(),
+          level: 'INFO',
+          source: 'env',
+          message: 'DDEV container router bound to port 80/443.',
+        },
+      ] as any,
+    };
+  }
+
+  if (cmd === 'clear_logs' || cmd === 'append_log') {
+    return { ok: true, data: true as any };
+  }
+
+  if (cmd === 'get_container_logs') {
+    return {
+      ok: true,
+      data: [
+        '[ddev-router] Starting Nginx reverse proxy...',
+        '[ddev-web] Ready for HTTP connections on port 80',
+      ] as any,
     };
   }
 

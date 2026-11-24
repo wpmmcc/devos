@@ -14,6 +14,7 @@ import { ConflictDoctorModal } from './components/ConflictDoctorModal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { SettingsModal } from './components/SettingsModal';
 import { TimeMachineModal } from './components/TimeMachineModal';
+import { LogViewerModal } from './components/LogViewerModal';
 import { ToastContainer, ToastItem } from './components/ToastContainer';
 import { switchLanguage } from './i18n';
 import {
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
   // Toasts state
@@ -297,6 +299,7 @@ export const App: React.FC = () => {
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenTimeMachine={() => setIsTimeMachineOpen(true)}
+          onOpenLogs={() => setIsLogModalOpen(true)}
           onShowToast={(type, msg) => addToast(type, msg)}
         />
 
@@ -405,17 +408,25 @@ export const App: React.FC = () => {
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onOpenConflictDoctor={() => setIsConflictDoctorOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenLogs={() => setIsLogModalOpen(true)}
         isEnvRunning={true}
       />
 
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        onOpenLogs={() => setIsLogModalOpen(true)}
       />
 
       <TimeMachineModal
         isOpen={isTimeMachineOpen}
         onClose={() => setIsTimeMachineOpen(false)}
+        projectPath={currentProjectPath}
+      />
+
+      <LogViewerModal
+        isOpen={isLogModalOpen}
+        onClose={() => setIsLogModalOpen(false)}
         projectPath={currentProjectPath}
       />
 

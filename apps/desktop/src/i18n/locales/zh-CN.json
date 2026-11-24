@@ -72,7 +72,8 @@
     "undoSuccess": "已恢复至上一个代码快照！工作区代码已干净复原。",
     "bgTaskRunning": "后台任务运行中",
     "openInAgent": "在 Agent 中开始",
-    "cmdKHint": "按 Cmd+K 快捷搜索与操作"
+    "cmdKHint": "按 Cmd+K 快捷搜索与操作",
+    "logs": "运行日志"
   },
   "board": {
     "todo": "待开发",
@@ -242,7 +243,8 @@
       "exportDiagBtn": "导出诊断包 (.zip)",
       "versionInfo": "当前版本: v{{version}}",
       "checkUpdate": "检查更新",
-      "upToDate": "当前已是最新版本"
+      "upToDate": "当前已是最新版本",
+      "openLogViewerBtn": "打开实时运行日志查看器"
     },
     "commandPalette": {
       "placeholder": "输入指令或搜索动作 (如: 切换项目、启动环境、体检、时光机)...",
@@ -261,7 +263,38 @@
       "toolDoctor": "打开环境体检向导 (Doctor)",
       "toolConflict": "打开端口冲突诊断 (Conflict)",
       "toolSettings": "打开偏好设置与诊断中心",
-      "noResults": "未匹配到相关操作"
+      "noResults": "未匹配到相关操作",
+      "toolLogs": "查看运行与环境日志"
+    },
+    "logs": {
+      "title": "运行与环境日志",
+      "subtitle": "低噪结构化日志流与容器排障中心 (对标 OrbStack / Docker Desktop)",
+      "entries": "条记录",
+      "errors": "处错误",
+      "exportBtn": "导出脱敏诊断包",
+      "exportTooltip": "导出脱敏后的系统与环境诊断数据包",
+      "exportSuccess": "诊断包已导出至: {{path}}",
+      "copyBtn": "复制日志",
+      "copied": "已复制",
+      "copyTooltip": "复制当前过滤的全部日志",
+      "clearBtn": "清空缓冲区",
+      "clearTooltip": "清空当前内存中的日志缓冲区",
+      "tabSystem": "系统与框架日志",
+      "tabContainer": "容器输出 (Docker/DDEV)",
+      "sourceAll": "全部源",
+      "sourceCore": "DevOS 内核",
+      "sourceEnv": "容器环境",
+      "sourceRunner": "任务执行器",
+      "sourceProbe": "浏览器探针",
+      "sourceDeploy": "发布插件",
+      "searchPlaceholder": "搜索关键字 / 模块...",
+      "autoScroll": "自动滚动",
+      "autoScrollOn": "已开启自动滚动至底部",
+      "autoScrollOff": "已暂停自动滚动",
+      "noLogs": "当前筛选条件下暂无匹配的系统日志",
+      "noContainerLogs": "容器尚未启动或暂无标准输出日志",
+      "memoryLimitHint": "内存背压限制: 最多保留 2,000 条最近记录",
+      "diskLimitHint": "磁盘滚动上限: 单文件 10 MB 滚动覆盖"
     }
   },
   "toast": {

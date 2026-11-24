@@ -9,7 +9,7 @@ use devos_env::{
 };
 use devos_schema::{
     AgentDetection, ApiResponse, BoardCard, BoardColumn, DevosProject, Issue, IssueSeverity,
-    ProjectType, RunManifest, SourceType,
+    LogEntry, LogFilter, LogLevel, LogSource, ProjectType, RunManifest, SourceType,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -252,6 +252,26 @@ fn create_web_issue(
 ) -> ApiResponse<Issue> {
     let res = (|| -> Result<Issue> {
         let (root, project) = ProjectManager::find_and_load(&project_path)?;
+
+        // Fetch recent container / backend logs for this project (up to 50 lines)
+        let mut raw_backend_logs = Vec::new();
+        if let Ok(lines) = DdevDriver::new().logs(&root, 50) {
+            raw_backend_logs = lines;
+        }
+        if raw_backend_logs.is_empty() {
+            let recent_entries = devos_core::get_logs(&LogFilter {
+                min_level: None,
+                source: Some(LogSource::Env),
+                query: None,
+                limit: Some(50),
+            });
+            raw_backend_logs = recent_entries.into_iter().map(|e| e.message).collect();
+        }
+        let backend_logs_tail: Vec<String> = raw_backend_logs
+            .into_iter()
+            .map(|l| devos_core::sanitize_text(&l))
+            .collect();
+
         let mut context = devos_schema::CapturedContext::default();
         context.web = Some(devos_schema::WebContext {
             url,
@@ -260,7 +280,7 @@ fn create_web_issue(
             annotated_region: None,
             console_errors,
             failed_requests,
-            backend_logs_tail: vec![],
+            backend_logs_tail,
         });
 
         let issue = IssueManager::create_issue(
@@ -664,6 +684,61 @@ fn export_diagnostic_bundle(project_path: Option<String>) -> ApiResponse<String>
 }
 
 #[tauri::command]
+fn get_logs(filter: Option<LogFilter>) -> ApiResponse<Vec<LogEntry>> {
+    let f = filter.unwrap_or_default();
+    let entries = devos_core::get_logs(&f);
+    ApiResponse::success(entries)
+}
+
+#[tauri::command]
+fn clear_logs() -> ApiResponse<bool> {
+    devos_core::clear_logs();
+    ApiResponse::success(true)
+}
+
+#[tauri::command]
+fn append_log(
+    level: String,
+    source: String,
+    message: String,
+    project_slug: Option<String>,
+) -> ApiResponse<bool> {
+    let lvl = level.parse::<LogLevel>().unwrap_or(LogLevel::Info);
+    let src = source.parse::<LogSource>().unwrap_or(LogSource::Core);
+    devos_core::log_entry(lvl, src, message, None, project_slug);
+    ApiResponse::success(true)
+}
+
+#[tauri::command]
+fn get_container_logs(project_path: String, tail: Option<usize>) -> ApiResponse<Vec<String>> {
+    let res = (|| -> Result<Vec<String>> {
+        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let t = tail.unwrap_or(100);
+        let mut logs = match project.project_type {
+            ProjectType::Web => DdevDriver::new().logs(&root, t)?,
+            ProjectType::Script => DevcontainerDriver::new().logs(&root, t)?,
+            ProjectType::Hybrid => {
+                let mut web_logs = DdevDriver::new().logs(&root, t).unwrap_or_default();
+                let mut script_logs = DevcontainerDriver::new().logs(&root, t).unwrap_or_default();
+                web_logs.append(&mut script_logs);
+                web_logs
+            }
+        };
+        if logs.is_empty() {
+            let entries = devos_core::get_logs(&LogFilter {
+                min_level: None,
+                source: Some(LogSource::Env),
+                query: None,
+                limit: Some(t),
+            });
+            logs = entries.into_iter().map(|e| e.message).collect();
+        }
+        Ok(logs)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
 fn export_release_bundle(
     project_path: String,
     version: String,
@@ -864,6 +939,10 @@ pub fn run() {
             race_mirrors_speed,
             import_local_tool_package,
             export_diagnostic_bundle,
+            get_logs,
+            clear_logs,
+            append_log,
+            get_container_logs,
             export_release_bundle,
             list_vcs_checkpoints,
             create_vcs_checkpoint,

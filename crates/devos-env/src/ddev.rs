@@ -184,4 +184,27 @@ impl EnvDriver for DdevDriver {
         }
         Ok(())
     }
+
+    fn logs(&self, project_root: &Path, tail: usize) -> Result<Vec<String>> {
+        let tail_str = tail.to_string();
+        let mut cmd = Command::new("ddev");
+        cmd.args(["logs", "--tail", &tail_str])
+            .current_dir(project_root);
+        inject_proxy_bypass_env(&mut cmd);
+
+        match cmd.output() {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let combined = format!("{}\n{}", stdout, stderr);
+                let lines: Vec<String> = combined
+                    .lines()
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                Ok(lines)
+            }
+            Err(_) => Ok(vec![]),
+        }
+    }
 }

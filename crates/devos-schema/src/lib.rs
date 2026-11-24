@@ -4,6 +4,7 @@ pub mod daemon;
 pub mod decision;
 pub mod envelope;
 pub mod issue;
+pub mod log;
 pub mod project;
 pub mod response;
 pub mod run_manifest;
@@ -18,6 +19,7 @@ pub use issue::{
     IssueResolution, IssueSeverity, IssueStatus, RetestRecord, ScriptContext, SourceType,
     UserReport, WebContext,
 };
+pub use log::{LogEntry, LogFilter, LogLevel, LogSource};
 pub use project::{
     DevosProject, EnvironmentsConfig, GuardrailsConfig, HealthCheckConfig, ProjectMode,
     ProjectType, ScriptEnvironment, WebEnvironment, WorkspacePaths,
