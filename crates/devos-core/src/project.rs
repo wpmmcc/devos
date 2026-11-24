@@ -124,12 +124,23 @@ impl ProjectManager {
         );
         atomic_write(root.join("AGENTS.md"), agents_md)?;
 
-        // 5. If script or hybrid, create initial devos.run.json
+        // 5. If script or hybrid, create initial devos.run.json and .devcontainer/devcontainer.json
         if matches!(project_type, ProjectType::Script | ProjectType::Hybrid) {
             let run_manifest_path = root.join("devos.run.json");
             if !run_manifest_path.exists() {
                 let default_manifest = RunManifest::default();
                 atomic_write_json(&run_manifest_path, &default_manifest)?;
+            }
+
+            let dc_dir = root.join(".devcontainer");
+            let dc_config = dc_dir.join("devcontainer.json");
+            if !dc_config.exists() {
+                let _ = fs::create_dir_all(&dc_dir);
+                let default_dc = serde_json::json!({
+                    "name": slug,
+                    "image": "mcr.microsoft.com/devcontainers/python:3.11"
+                });
+                let _ = atomic_write(&dc_config, serde_json::to_string_pretty(&default_dc).unwrap_or_default());
             }
         }
 

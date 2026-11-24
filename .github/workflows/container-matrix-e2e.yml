@@ -1,0 +1,153 @@
+name: Container Matrix & Real Lifecycle E2E
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # 1. Real Container Execution on Ubuntu (Native Docker Engine)
+  # ============================================================================
+  ubuntu-real-containers:
+    name: Ubuntu 24.04 Native Container E2E (DDEV + DevContainer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js & DevContainer CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g @devcontainers/cli
+
+      - name: Setup DDEV
+        uses: ddev/github-action-setup-ddev@v1
+        with:
+          autostart: false
+
+      - name: Verify Docker Daemon & Engines
+        run: |
+          echo "=== Docker Daemon ==="
+          docker info
+          echo "=== DDEV Version ==="
+          ddev --version
+          echo "=== DevContainer Version ==="
+          devcontainer --version
+
+      - name: Build DevOS CLI Binary
+        run: cargo build -p devos-cli
+
+      - name: Execute Live Container Lifecycle E2E Suite
+        env:
+          DEVOS_BIN: ./target/debug/devos
+          PYTHONIOENCODING: "utf-8"
+        run: |
+          python3 scripts/test_ci_real_containers.py
+
+  # ============================================================================
+  # 2. macOS Environment Preflight & Engine Driver Verification
+  # ============================================================================
+  macos-container-driver:
+    name: macOS Runner Engine Driver & Doctor Verification
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js & DevContainer CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g @devcontainers/cli
+
+      - name: Setup DDEV CLI
+        run: |
+          python3 -c "import os, urllib.request, json, platform; arch = 'macos-arm64' if platform.machine() == 'arm64' else 'macos-amd64'; data = json.loads(urllib.request.urlopen('https://api.github.com/repos/ddev/ddev/releases/latest').read()); url = [a['browser_download_url'] for a in data['assets'] if arch in a['name'] and a['name'].endswith('.tar.gz')][0]; os.system(f'curl -fsSL \"{url}\" | sudo tar -xz -C /usr/local/bin ddev'); os.system('sudo chmod +x /usr/local/bin/ddev')"
+
+      - name: Build DevOS CLI
+        run: cargo build -p devos-cli
+
+      - name: Run CLI Preflight Doctor
+        run: ./target/debug/devos doctor --json
+
+      - name: Verify Driver Scaffolding & Zero-Pollution Guardrails
+        run: |
+          python3 scripts/test_framework_compatibility_stability.py
+
+  # ============================================================================
+  # 3. Windows Environment Preflight & Driver Matrix Verification
+  # ============================================================================
+  windows-container-driver:
+    name: Windows Runner Driver Matrix & Port Guardrails
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup DevContainer CLI
+        run: npm install -g @devcontainers/cli
+
+      - name: Setup DDEV CLI (Windows)
+        shell: bash
+        run: |
+          python -c "import os, zipfile, urllib.request, json; from pathlib import Path; data = json.loads(urllib.request.urlopen('https://api.github.com/repos/ddev/ddev/releases/latest').read()); url = [a['browser_download_url'] for a in data['assets'] if 'windows-amd64' in a['name'] and a['name'].endswith('.zip')][0]; tools = Path('C:/tools/ddev'); tools.mkdir(parents=True, exist_ok=True); zip_p = tools / 'ddev.zip'; urllib.request.urlretrieve(url, zip_p); zipfile.ZipFile(zip_p).extractall(tools); f = open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8'); f.write(str(tools) + '\n'); f.close()"
+
+      - name: Add npm prefix to PATH
+        shell: bash
+        run: |
+          python -c "import os, subprocess; prefix = subprocess.check_output('npm config get prefix', shell=True, text=True).strip(); f = open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8'); f.write(prefix + '\n'); f.close()"
+
+      - name: Build DevOS CLI
+        run: cargo build -p devos-cli
+
+      - name: Run CLI Preflight Doctor
+        run: cargo run -p devos-cli -- doctor --json
+
+      - name: Verify Comprehensive E2E Simulation & Port Collision Guardrails
+        env:
+          PYTHONIOENCODING: "utf-8"
+        run: |
+          python scripts/test_e2e_comprehensive.py

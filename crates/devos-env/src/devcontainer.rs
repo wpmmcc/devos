@@ -21,6 +21,35 @@ impl DevcontainerDriver {
     }
 }
 
+fn find_devcontainer(project_root: &Path) -> Option<(String, String, String)> {
+    let folder_str = project_root.display().to_string();
+    let filters = [
+        format!("label=devcontainer.local_folder={}", folder_str),
+        format!("label=vsch.local.folder={}", folder_str),
+    ];
+    for filter in &filters {
+        let mut cmd = Command::new("docker");
+        cmd.args(["ps", "--filter", filter, "--format", "{{.ID}}|{{.Names}}|{{.Status}}"]);
+        inject_proxy_bypass_env(&mut cmd);
+        if let Ok(out) = cmd.output() {
+            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !stdout.is_empty() {
+                if let Some(first_line) = stdout.lines().next() {
+                    let parts: Vec<&str> = first_line.split('|').collect();
+                    if parts.len() >= 2 {
+                        return Some((
+                            parts[0].to_string(),
+                            parts[1].to_string(),
+                            parts.get(2).unwrap_or(&"").to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 impl EnvDriver for DevcontainerDriver {
     fn driver_name(&self) -> &'static str {
         "devcontainer"
@@ -35,6 +64,24 @@ impl EnvDriver for DevcontainerDriver {
     }
 
     fn up(&self, project_root: &Path) -> Result<EnvStatus> {
+        let dc_dir = project_root.join(".devcontainer");
+        let dc_config = dc_dir.join("devcontainer.json");
+        if !dc_config.exists() {
+            let _ = std::fs::create_dir_all(&dc_dir);
+            let folder_name = project_root
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("devos-script");
+            let default_dc = serde_json::json!({
+                "name": folder_name,
+                "image": "mcr.microsoft.com/devcontainers/python:3.11"
+            });
+            let _ = std::fs::write(
+                &dc_config,
+                serde_json::to_string_pretty(&default_dc).unwrap_or_default(),
+            );
+        }
+
         let mut cmd = get_dc_command();
         cmd.arg("up").arg("--workspace-folder").arg(project_root);
         inject_proxy_bypass_env(&mut cmd);
@@ -62,59 +109,26 @@ impl EnvDriver for DevcontainerDriver {
     }
 
     fn down(&self, project_root: &Path) -> Result<()> {
-        let folder_str = project_root.display().to_string();
-        let mut ps_cmd = Command::new("docker");
-        ps_cmd.args([
-            "ps",
-            "-q",
-            "--filter",
-            &format!("label=vsch.local.folder={}", folder_str),
-        ]);
-        inject_proxy_bypass_env(&mut ps_cmd);
-
-        let _ = ps_cmd.output().and_then(|out| {
-            let id = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !id.is_empty() {
-                let mut stop_cmd = Command::new("docker");
-                stop_cmd.args(["stop", &id]);
-                inject_proxy_bypass_env(&mut stop_cmd);
-                stop_cmd.output()
-            } else {
-                Ok(out)
-            }
-        });
+        if let Some((id, _, _)) = find_devcontainer(project_root) {
+            let mut stop_cmd = Command::new("docker");
+            stop_cmd.args(["stop", &id]);
+            inject_proxy_bypass_env(&mut stop_cmd);
+            let _ = stop_cmd.output();
+        }
         Ok(())
     }
 
     fn status(&self, project_root: &Path) -> Result<EnvStatus> {
-        let folder_str = project_root.display().to_string();
-        let mut cmd = Command::new("docker");
-        cmd.args([
-            "ps",
-            "--filter",
-            &format!("label=vsch.local.folder={}", folder_str),
-            "--format",
-            "{{.ID}}|{{.Names}}|{{.Status}}",
-        ]);
-        inject_proxy_bypass_env(&mut cmd);
-
-        let output = cmd.output();
-
-        if let Ok(out) = output {
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !stdout.is_empty() {
-                let parts: Vec<&str> = stdout.split('|').collect();
-                let name = parts.get(1).map(|s| s.to_string());
-                return Ok(EnvStatus {
-                    running: true,
-                    driver: "devcontainer".to_string(),
-                    primary_url: None,
-                    container_name: name,
-                    details: Some(serde_json::json!({
-                        "container_info": stdout
-                    })),
-                });
-            }
+        if let Some((_id, name, status_info)) = find_devcontainer(project_root) {
+            return Ok(EnvStatus {
+                running: true,
+                driver: "devcontainer".to_string(),
+                primary_url: None,
+                container_name: Some(name),
+                details: Some(serde_json::json!({
+                    "container_info": status_info
+                })),
+            });
         }
 
         Ok(EnvStatus {

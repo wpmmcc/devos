@@ -62,6 +62,8 @@ enum Commands {
         cmd: Option<String>,
         #[arg(long)]
         snapshot_name: Option<String>,
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
     },
 
     /// Lightweight 4-column Board management
@@ -373,6 +375,7 @@ async fn main() {
             target,
             cmd,
             snapshot_name,
+            args,
         } => {
             let res = (|| -> Result<serde_json::Value> {
                 let (root, project) = get_project_context(cli.project_dir)?;
@@ -398,12 +401,18 @@ async fn main() {
                         Ok(serde_json::json!({ "status": "stopped" }))
                     }
                     "exec" => {
-                        let command = cmd.ok_or_else(|| DevosError::Custom {
-                            code: "MISSING_ARG".to_string(),
-                            message: "Missing --cmd argument for exec".to_string(),
-                            hint: Some("Specify --cmd 'your command'".to_string()),
-                            plain_message: Some("执行命令时请提供 --cmd 参数".to_string()),
-                        })?;
+                        let command = if let Some(c) = cmd {
+                            c
+                        } else if !args.is_empty() {
+                            args.join(" ")
+                        } else {
+                            return Err(DevosError::Custom {
+                                code: "MISSING_ARG".to_string(),
+                                message: "Missing command for exec. Use --cmd <cmd> or pass arguments after --".to_string(),
+                                hint: Some("Specify --cmd 'your command' or pass arguments after '--'".to_string()),
+                                plain_message: Some("执行命令时请提供 --cmd 参数或在 -- 后跟随命令".to_string()),
+                            });
+                        };
                         let exec_res = driver.exec(&root, &command, 60, &[])?;
                         Ok(serde_json::to_value(exec_res)?)
                     }
