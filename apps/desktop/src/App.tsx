@@ -62,14 +62,15 @@ export const App: React.FC = () => {
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
   // Environment Runtime state
-  const [isEnvRunning, setIsEnvRunning] = useState<boolean>(true);
+  const [isEnvRunning, setIsEnvRunning] = useState<boolean>(false);
   const [isEnvBusy, setIsEnvBusy] = useState<boolean>(false);
 
   const handleToggleEnv = async () => {
     if (!project || isEnvBusy) return;
     setIsEnvBusy(true);
+    const targetPath = currentProjectPathRef.current || currentProjectPath || project.slug;
     if (isEnvRunning) {
-      const res = await Bridge.stopEnv('.', 'auto');
+      const res = await Bridge.stopEnv(targetPath, 'auto');
       if (res.ok) {
         setIsEnvRunning(false);
         addToast('info', t('toast.envStopped'));
@@ -77,7 +78,7 @@ export const App: React.FC = () => {
         addToast('error', res.error.plain_message || res.error.message);
       }
     } else {
-      const res = await Bridge.startEnv('.', 'auto');
+      const res = await Bridge.startEnv(targetPath, 'auto');
       if (res.ok) {
         setIsEnvRunning(true);
         addToast('success', t('toast.envStarted'));
@@ -92,8 +93,9 @@ export const App: React.FC = () => {
     if (!project || isEnvBusy) return;
     setIsEnvBusy(true);
     addToast('info', t('topbar.restartingEnv'));
-    await Bridge.stopEnv('.', 'auto');
-    const res = await Bridge.startEnv('.', 'auto');
+    const targetPath = currentProjectPathRef.current || currentProjectPath || project.slug;
+    await Bridge.stopEnv(targetPath, 'auto');
+    const res = await Bridge.startEnv(targetPath, 'auto');
     if (res.ok) {
       setIsEnvRunning(true);
       addToast('success', t('toast.envStarted'));
@@ -188,6 +190,18 @@ export const App: React.FC = () => {
     return [];
   };
 
+  const refreshEnvStatus = async (projPath?: string) => {
+    const target = projPath || currentProjectPathRef.current || currentProjectPath || '.';
+    try {
+      const res = await Bridge.getEnvStatus(target, 'auto');
+      if (res.ok && res.data) {
+        setIsEnvRunning(res.data.running);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const loadProjectData = async (projPath: string) => {
     currentProjectPathRef.current = projPath;
     setCurrentProjectPath(projPath);
@@ -197,6 +211,7 @@ export const App: React.FC = () => {
       refreshCards(projPath);
       refreshIssues(projPath);
       refreshManifest(projPath);
+      refreshEnvStatus(projPath);
       loadRecentProjects();
     }
   };
@@ -430,7 +445,8 @@ export const App: React.FC = () => {
         runningProjectsCount={isEnvRunning && project ? 1 : 0}
         onStopAllEnvironments={async () => {
           if (project) {
-            await Bridge.stopEnv('.', 'auto');
+            const targetPath = currentProjectPathRef.current || currentProjectPath || project.slug;
+            await Bridge.stopEnv(targetPath, 'auto');
             setIsEnvRunning(false);
           }
           addToast('info', t('sidebar.stopAllSuccess'));
@@ -531,7 +547,9 @@ export const App: React.FC = () => {
         onNavigateTab={(tab) => setActiveTab(tab)}
         onToggleEnv={async () => {
           if (!project) return;
-          await Bridge.stopEnv('.', 'auto');
+          const targetPath = currentProjectPathRef.current || currentProjectPath || project.slug;
+          await Bridge.stopEnv(targetPath, 'auto');
+          setIsEnvRunning(false);
           addToast('info', t('toast.envStopped'));
         }}
         onTakeSnapshot={() => {

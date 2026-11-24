@@ -9,7 +9,7 @@ impl Guardrails {
     pub fn check_destructive_allowed(project: &DevosProject, action: &str) -> Result<()> {
         let is_destructive = matches!(
             action,
-            "down" | "restore" | "drop" | "purge" | "reset" | "clean"
+            "restore" | "drop" | "purge" | "reset" | "clean"
         );
 
         if is_destructive {

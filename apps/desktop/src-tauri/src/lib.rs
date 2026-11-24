@@ -40,6 +40,63 @@ fn to_api_resp<T>(res: Result<T>) -> ApiResponse<T> {
     }
 }
 
+fn resolve_project_root(path_str: &str) -> PathBuf {
+    let p = Path::new(path_str);
+    if path_str != "." && !path_str.is_empty() && p.is_absolute() && p.exists() {
+        return p.to_path_buf();
+    }
+    if let Some(home) = dirs::home_dir() {
+        let devos_projects = home.join("DevOSProjects");
+        if path_str != "." && !path_str.is_empty() {
+            let candidate = devos_projects.join(path_str);
+            if candidate.join("devos.json").exists() {
+                return candidate;
+            }
+        }
+    }
+    if p.exists() && path_str != "." && !path_str.is_empty() {
+        if let Ok(abs) = p.canonicalize() {
+            if abs.join("devos.json").exists() {
+                return abs;
+            }
+        }
+    }
+    if let Ok(db) = Database::open_global() {
+        if let Ok(Some(last_path)) = db.get_last_active_project() {
+            let last = PathBuf::from(&last_path);
+            if last.join("devos.json").exists() {
+                return last;
+            }
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        let devos_projects = home.join("DevOSProjects");
+        if let Ok(entries) = std::fs::read_dir(&devos_projects) {
+            for entry in entries.flatten() {
+                let sub = entry.path();
+                if sub.join("devos.json").exists() {
+                    return sub;
+                }
+            }
+        }
+    }
+    p.to_path_buf()
+}
+
+fn load_project_safe(path_str: &str) -> Result<(PathBuf, DevosProject)> {
+    let resolved = resolve_project_root(path_str);
+    ProjectManager::find_and_load(&resolved)
+}
+
+fn get_env_driver(target: &str, project_type: &ProjectType) -> Box<dyn EnvDriver> {
+    match (target, project_type) {
+        ("script", _) => Box::new(DevcontainerDriver::new()),
+        ("web", _) => Box::new(DdevDriver::new()),
+        (_, ProjectType::Script) => Box::new(DevcontainerDriver::new()),
+        _ => Box::new(DdevDriver::new()),
+    }
+}
+
 #[tauri::command]
 fn run_preflight_doctor() -> ApiResponse<Vec<DiagnosticItem>> {
     let diags = PreflightDoctor::diagnose_all();
@@ -117,7 +174,7 @@ fn init_project(
 
     let resolved_path = if target_path.is_empty() || target_path == "." {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        home.join("devos-projects").join(&slug)
+        home.join("DevOSProjects").join(&slug)
     } else {
         let p = PathBuf::from(&target_path);
         if p.file_name().and_then(|s| s.to_str()) == Some(&slug) {
@@ -164,7 +221,8 @@ fn load_project(
     project_path: String,
 ) -> ApiResponse<DevosProject> {
     let res = (|| -> Result<DevosProject> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let p_resolved = resolve_project_root(&project_path);
+        let (root, project) = ProjectManager::find_and_load(&p_resolved)?;
         if let Ok(db) = Database::open_global() {
             let _ = ProjectManager::sync_to_db(&root, &project, &db);
             let _ = db.add_recent_project(
@@ -221,7 +279,7 @@ fn setup_watcher(app: &AppHandle, state: &State<'_, ActiveWatcherState>, root: &
 #[tauri::command]
 fn list_board_cards(project_path: String) -> ApiResponse<Vec<BoardCard>> {
     let res = (|| -> Result<Vec<BoardCard>> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         BoardManager::list_cards(&root, &project)
     })();
     to_api_resp(res)
@@ -236,7 +294,7 @@ fn move_board_card(
     updated_by: String,
 ) -> ApiResponse<BoardCard> {
     let res = (|| -> Result<BoardCard> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         let col = match column.as_str() {
             "doing" => BoardColumn::Doing,
             "testing" => BoardColumn::Testing,
@@ -266,7 +324,7 @@ fn create_board_card(
     title: String,
 ) -> ApiResponse<BoardCard> {
     let res = (|| -> Result<BoardCard> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         let card = BoardManager::upsert_card(
             &root,
             &project,
@@ -286,7 +344,7 @@ fn create_board_card(
 #[tauri::command]
 fn list_issues(project_path: String, status: Option<String>) -> ApiResponse<Vec<Issue>> {
     let res = (|| -> Result<Vec<Issue>> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         IssueManager::list_issues(&root, &project, status.as_deref())
     })();
     to_api_resp(res)
@@ -305,7 +363,7 @@ fn create_web_issue(
     failed_requests: Vec<devos_schema::FailedRequestRecord>,
 ) -> ApiResponse<Issue> {
     let res = (|| -> Result<Issue> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
 
         // Fetch recent container / backend logs for this project (up to 50 lines)
         let mut raw_backend_logs = Vec::new();
@@ -365,7 +423,7 @@ fn create_script_issue(
     script_context: devos_schema::ScriptContext,
 ) -> ApiResponse<Issue> {
     let res = (|| -> Result<Issue> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         let mut context = devos_schema::CapturedContext::default();
         context.script = Some(script_context);
 
@@ -396,7 +454,7 @@ fn retest_issue(
     feedback: String,
 ) -> ApiResponse<Issue> {
     let res = (|| -> Result<Issue> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         let issue = IssueManager::retest_issue(&root, &project, &issue_id, passed, &feedback)?;
         let _ = app.emit("devos://issues-updated", &issue.issue_id);
         Ok(issue)
@@ -424,7 +482,7 @@ fn execute_script_target(
     inputs: serde_json::Value,
 ) -> ApiResponse<devos_schema::ScriptContext> {
     let res = (|| -> Result<devos_schema::ScriptContext> {
-        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let (root, _) = load_project_safe(&project_path)?;
         let manifest_path = root.join("devos.run.json");
         let manifest: RunManifest = read_json(&manifest_path)?;
         let target = manifest
@@ -518,11 +576,8 @@ where
 #[tauri::command]
 fn get_env_status(project_path: String, target: String) -> ApiResponse<EnvStatus> {
     let res = (|| -> Result<EnvStatus> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
-        let driver: Box<dyn EnvDriver> = match (target.as_str(), &project.project_type) {
-            ("script", _) => Box::new(DevcontainerDriver::new()),
-            _ => Box::new(DdevDriver::new()),
-        };
+        let (root, project) = load_project_safe(&project_path)?;
+        let driver = get_env_driver(&target, &project.project_type);
         driver.status(&root)
     })();
     to_api_resp(res)
@@ -535,12 +590,9 @@ fn start_environment(
     target: String,
 ) -> ApiResponse<EnvStatus> {
     let res = (|| -> Result<EnvStatus> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         with_env_lock(&env_locks, &root, || {
-            let driver: Box<dyn EnvDriver> = match (target.as_str(), &project.project_type) {
-                ("script", _) => Box::new(DevcontainerDriver::new()),
-                _ => Box::new(DdevDriver::new()),
-            };
+            let driver = get_env_driver(&target, &project.project_type);
             driver.up(&root)
         })
     })();
@@ -554,13 +606,9 @@ fn stop_environment(
     target: String,
 ) -> ApiResponse<bool> {
     let res = (|| -> Result<bool> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
-        Guardrails::check_destructive_allowed(&project, "down")?;
+        let (root, project) = load_project_safe(&project_path)?;
         with_env_lock(&env_locks, &root, || {
-            let driver: Box<dyn EnvDriver> = match (target.as_str(), &project.project_type) {
-                ("script", _) => Box::new(DevcontainerDriver::new()),
-                _ => Box::new(DdevDriver::new()),
-            };
+            let driver = get_env_driver(&target, &project.project_type);
             driver.down(&root)?;
             Ok(true)
         })
@@ -575,17 +623,14 @@ fn create_snapshot(
     name: String,
 ) -> ApiResponse<String> {
     let res = (|| -> Result<String> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         let snap_name = if name.trim().is_empty() {
             format!("snap_{}", chrono::Utc::now().format("%Y%m%d_%H%M%S"))
         } else {
             name.trim().to_string()
         };
         with_env_lock(&env_locks, &root, || {
-            let driver: Box<dyn EnvDriver> = match project.project_type {
-                ProjectType::Script => Box::new(DevcontainerDriver::new()),
-                _ => Box::new(DdevDriver::new()),
-            };
+            let driver = get_env_driver("auto", &project.project_type);
             driver.snapshot(&root, &snap_name)?;
             Ok(snap_name)
         })
@@ -600,13 +645,10 @@ fn restore_snapshot(
     name: String,
 ) -> ApiResponse<String> {
     let res = (|| -> Result<String> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         Guardrails::check_destructive_allowed(&project, "restore")?;
         with_env_lock(&env_locks, &root, || {
-            let driver: Box<dyn EnvDriver> = match project.project_type {
-                ProjectType::Script => Box::new(DevcontainerDriver::new()),
-                _ => Box::new(DdevDriver::new()),
-            };
+            let driver = get_env_driver("auto", &project.project_type);
             driver.restore(&root, &name)?;
             Ok(name)
         })
@@ -627,7 +669,7 @@ fn reconfigure_web_ports(
     https_port: u16,
 ) -> ApiResponse<String> {
     let res = (|| -> Result<String> {
-        let (root, mut project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, mut project) = load_project_safe(&project_path)?;
         let mut cfg_cmd = std::process::Command::new("ddev");
         cfg_cmd
             .args([
@@ -766,7 +808,7 @@ fn append_log(
 #[tauri::command]
 fn get_container_logs(project_path: String, tail: Option<usize>) -> ApiResponse<Vec<String>> {
     let res = (|| -> Result<Vec<String>> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         let t = tail.unwrap_or(100);
         let mut logs = match project.project_type {
             ProjectType::Web => DdevDriver::new().logs(&root, t)?,
@@ -799,7 +841,7 @@ fn export_release_bundle(
     panel_friendly: bool,
 ) -> ApiResponse<ReleaseBuildResult> {
     let res = (|| -> Result<ReleaseBuildResult> {
-        let (root, project) = ProjectManager::find_and_load(&project_path)?;
+        let (root, project) = load_project_safe(&project_path)?;
         ReleaseManager::prepare_release_artifacts(&root, &project, &version, panel_friendly)
     })();
     to_api_resp(res)
@@ -808,7 +850,7 @@ fn export_release_bundle(
 #[tauri::command]
 fn list_vcs_checkpoints(project_path: String) -> ApiResponse<Vec<Checkpoint>> {
     let res = (|| -> Result<Vec<Checkpoint>> {
-        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let (root, _) = load_project_safe(&project_path)?;
         CheckpointManager::list_checkpoints(&root)
     })();
     to_api_resp(res)
@@ -821,7 +863,7 @@ fn create_vcs_checkpoint(
     source: String,
 ) -> ApiResponse<Checkpoint> {
     let res = (|| -> Result<Checkpoint> {
-        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let (root, _) = load_project_safe(&project_path)?;
         let src = if source.trim().is_empty() {
             "user_manual"
         } else {
@@ -835,7 +877,7 @@ fn create_vcs_checkpoint(
 #[tauri::command]
 fn restore_vcs_checkpoint(project_path: String, checkpoint_id: String) -> ApiResponse<bool> {
     let res = (|| -> Result<bool> {
-        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let (root, _) = load_project_safe(&project_path)?;
         CheckpointManager::restore_checkpoint(&root, &checkpoint_id).map(|_| true)
     })();
     to_api_resp(res)
@@ -844,7 +886,7 @@ fn restore_vcs_checkpoint(project_path: String, checkpoint_id: String) -> ApiRes
 #[tauri::command]
 fn get_storage_report(project_path: String) -> ApiResponse<StorageReport> {
     let res = (|| -> Result<StorageReport> {
-        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let (root, _) = load_project_safe(&project_path)?;
         Ok(StorageCleaner::calculate_storage_usage(&root))
     })();
     to_api_resp(res)
@@ -857,7 +899,7 @@ fn clean_storage(
     prune_docker: bool,
 ) -> ApiResponse<u64> {
     let res = (|| -> Result<u64> {
-        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let (root, _) = load_project_safe(&project_path)?;
         let freed = StorageCleaner::clean_expired_artifacts(&root, older_than_days)?;
         if prune_docker {
             let _ = StorageCleaner::prune_managed_docker_cache();
@@ -1080,7 +1122,7 @@ fn plan_deployment(
     deploy_dir: String,
 ) -> ApiResponse<devos_core::DeployPlan> {
     let res = (|| -> Result<devos_core::DeployPlan> {
-        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let (root, _) = load_project_safe(&project_path)?;
         let release_dir = root.join("releases");
         let mut cfg = std::collections::HashMap::new();
         cfg.insert("host".to_string(), host);
@@ -1098,7 +1140,7 @@ fn apply_deployment(
     deploy_dir: String,
 ) -> ApiResponse<devos_core::DeployResult> {
     let res = (|| -> Result<devos_core::DeployResult> {
-        let (root, _) = ProjectManager::find_and_load(&project_path)?;
+        let (root, _) = load_project_safe(&project_path)?;
         let release_dir = root.join("releases");
         let mut cfg = std::collections::HashMap::new();
         cfg.insert("host".to_string(), host);
