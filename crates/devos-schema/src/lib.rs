@@ -1,5 +1,6 @@
 pub mod agent;
 pub mod board;
+pub mod checkpoint;
 pub mod daemon;
 pub mod decision;
 pub mod envelope;
@@ -8,9 +9,11 @@ pub mod log;
 pub mod project;
 pub mod response;
 pub mod run_manifest;
+pub mod search;
 
 pub use agent::AgentDetection;
 pub use board::{BoardCard, BoardColumn, ChecklistStep};
+pub use checkpoint::{CheckpointInfo, FileDiffItem};
 pub use daemon::DaemonInfo;
 pub use decision::{DecisionOption, DecisionRequest};
 pub use envelope::{CallerType, CommandEnvelope, CommandErrorDetail, CommandMeta, PermissionLevel};
@@ -28,6 +31,7 @@ pub use response::{ApiErrorDetail, ApiResponse};
 pub use run_manifest::{
     ExpectedOutput, InputType, RunInput, RunManifest, RunTarget, SmokeTestConfig,
 };
+pub use search::SearchResult;
 
 #[cfg(test)]
 mod tests {

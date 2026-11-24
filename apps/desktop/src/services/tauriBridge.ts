@@ -124,6 +124,9 @@ export const Bridge = {
   getRunManifest: (projectPath: string) =>
     invokeTauri<RunManifest>('get_run_manifest', { projectPath }),
 
+  saveRunManifest: (projectPath: string, manifest: RunManifest) =>
+    invokeTauri<RunManifest>('save_run_manifest', { projectPath, manifest }),
+
   executeScript: (projectPath: string, targetId: string, inputs: Record<string, any>) =>
     invokeTauri<ScriptContext>('execute_script_target', { projectPath, targetId, inputs }),
 
@@ -135,6 +138,18 @@ export const Bridge = {
 
   stopEnv: (projectPath: string, target: string) =>
     invokeTauri<boolean>('stop_environment', { projectPath, target }),
+
+  rebuildEnv: (projectPath: string, target: string = 'auto') =>
+    invokeTauri<any>('rebuild_environment', { projectPath, target }),
+
+  openContainerTerminal: (projectPath: string, target: string = 'auto') =>
+    invokeTauri<boolean>('open_container_terminal', { projectPath, target }),
+
+  listPendingDecisions: (projectPath?: string) =>
+    invokeTauri<any[]>('list_pending_decisions', { projectPath }),
+
+  resolveUserDecision: (projectPath: string | undefined, decisionId: string, selectedOptionId: string) =>
+    invokeTauri<any>('resolve_user_decision', { projectPath, decisionId, selectedOptionId }),
 
   createSnapshot: (projectPath: string, name = '') =>
     invokeTauri<string>('create_snapshot', { projectPath, name }),
@@ -208,6 +223,12 @@ export const Bridge = {
 
   restoreCheckpoint: (projectPath: string, checkpointId: string) =>
     invokeTauri<boolean>('restore_vcs_checkpoint', { projectPath, checkpointId }),
+
+  getCheckpointDiff: (projectPath: string, checkpointId: string) =>
+    invokeTauri<import('../types').FileDiffItem[]>('get_checkpoint_diff', { projectPath, checkpointId }),
+
+  searchGlobal: (query: string, projectSlug?: string) =>
+    invokeTauri<import('../types').SearchResult[]>('search_global', { query, projectSlug }),
 
   getStorageReport: (projectPath: string) =>
     invokeTauri<{
@@ -502,6 +523,36 @@ function mockHandler<T>(cmd: string, args: Record<string, any>): ApiResponse<T> 
         { id: 'cp_before_refactor', created_at: new Date().toISOString(), note: 'Agent 处理任务前自动时光机快照', source: 'agent_auto' },
       ] as any,
     };
+  }
+
+  if (cmd === 'get_checkpoint_diff') {
+    return {
+      ok: true,
+      data: [
+        {
+          path: 'src/App.tsx',
+          status: 'modified',
+          additions: 12,
+          deletions: 3,
+          diff_preview: '@@ -10,3 +10,12 @@\n+ import { CommandPaletteModal } from "./CommandPaletteModal";\n+ import { TargetEditModal } from "./TargetEditModal";',
+        },
+      ] as any,
+    };
+  }
+
+  if (cmd === 'search_global') {
+    return {
+      ok: true,
+      data: [
+        { category: 'action', id: 'action:test', title: '运行测试 (Run Tests)', subtitle: '在容器中执行测试指令' },
+        { category: 'action', id: 'action:rebuild', title: '重建容器环境 (Rebuild Environment)', subtitle: '完全重构并启动容器' },
+        { category: 'action', id: 'action:shell', title: '打开容器终端 (Open Terminal)', subtitle: '交互式连接容器 CLI' },
+      ] as any,
+    };
+  }
+
+  if (cmd === 'save_run_manifest') {
+    return { ok: true, data: args.manifest };
   }
 
   if (cmd === 'create_vcs_checkpoint') {

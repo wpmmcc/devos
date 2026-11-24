@@ -10,8 +10,13 @@ import {
   Sparkles,
   ShieldAlert,
   Loader2,
+  FileCode,
+  ChevronDown,
+  ChevronUp,
+  FileDiff,
 } from 'lucide-react';
 import { Bridge } from '../services/tauriBridge';
+import { FileDiffItem } from '../types';
 
 interface Checkpoint {
   id: string;
@@ -80,6 +85,39 @@ export const TimeMachineModal: React.FC<TimeMachineModalProps> = ({
   };
 
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [expandedDiffId, setExpandedDiffId] = useState<string | null>(null);
+  const [diffLoadingId, setDiffLoadingId] = useState<string | null>(null);
+  const [diffDataMap, setDiffDataMap] = useState<Record<string, FileDiffItem[]>>({});
+  const [selectedDiffFile, setSelectedDiffFile] = useState<string | null>(null);
+
+  const handleToggleDiff = async (cpId: string) => {
+    if (expandedDiffId === cpId) {
+      setExpandedDiffId(null);
+      setSelectedDiffFile(null);
+      return;
+    }
+
+    setExpandedDiffId(cpId);
+    if (!diffDataMap[cpId]) {
+      setDiffLoadingId(cpId);
+      try {
+        const res = await Bridge.getCheckpointDiff(projectPath, cpId);
+        if (res.ok && res.data) {
+          const files = res.data;
+          setDiffDataMap((prev) => ({ ...prev, [cpId]: files }));
+          if (files.length > 0) {
+            setSelectedDiffFile(files[0].path);
+          }
+        }
+      } finally {
+        setDiffLoadingId(null);
+      }
+    } else {
+      if (diffDataMap[cpId].length > 0) {
+        setSelectedDiffFile(diffDataMap[cpId][0].path);
+      }
+    }
+  };
 
   const handleRestore = async (cp: Checkpoint) => {
     if (confirmingId !== cp.id) {
@@ -209,10 +247,8 @@ export const TimeMachineModal: React.FC<TimeMachineModalProps> = ({
               const dateStr = new Date(cp.created_at).toLocaleString();
 
               return (
-                <div
-                  key={cp.id}
-                  className="p-3.5 rounded-xl bg-[#0c1017] border border-[#1f2637] hover:border-cyan-500/30 transition flex items-center justify-between gap-4"
-                >
+                <React.Fragment key={cp.id}>
+                  <div className="p-3.5 rounded-xl bg-[#0c1017] border border-[#1f2637] hover:border-cyan-500/30 transition flex items-center justify-between gap-4">
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span
@@ -239,32 +275,133 @@ export const TimeMachineModal: React.FC<TimeMachineModalProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleRestore(cp)}
-                    disabled={operatingId === cp.id}
-                    className={`px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 border ${
-                      confirmingId === cp.id
-                        ? 'bg-rose-600 text-white border-rose-400 font-bold animate-pulse'
-                        : 'bg-[#171e2c] hover:bg-rose-950/30 text-slate-300 hover:text-rose-300 border-[#263147] hover:border-rose-500/40'
-                    }`}
-                    title={isEn ? 'Rollback project files to this checkpoint' : '回滚项目工作区到该快照'}
-                  >
-                    {operatingId === cp.id ? (
-                      <Loader2 size={12} className="animate-spin text-rose-400" />
-                    ) : (
-                      <RotateCcw size={12} className={confirmingId === cp.id ? 'text-white' : 'text-rose-400'} />
-                    )}
-                    <span>
-                      {operatingId === cp.id
-                        ? (isEn ? 'Reverting...' : '还原中...')
-                        : confirmingId === cp.id
-                        ? (isEn ? 'Confirm Revert?' : '确认回滚？')
-                        : (isEn ? 'Restore' : '时光回退')}
-                    </span>
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleToggleDiff(cp.id)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs transition flex items-center gap-1 border ${
+                        expandedDiffId === cp.id
+                          ? 'bg-cyan-950/60 text-cyan-300 border-cyan-500/50'
+                          : 'bg-[#141923] hover:bg-[#1c2433] text-slate-400 hover:text-slate-200 border-[#252f44]'
+                      }`}
+                      title={isEn ? 'View file diff preview before restore' : '查看快照与工作区变更对比'}
+                    >
+                      {diffLoadingId === cp.id ? (
+                        <Loader2 size={12} className="animate-spin text-cyan-400" />
+                      ) : (
+                        <FileDiff size={12} className="text-cyan-400" />
+                      )}
+                      <span>{isEn ? 'Diff' : '对比变更'}</span>
+                      {expandedDiffId === cp.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+
+                    <button
+                      onClick={() => handleRestore(cp)}
+                      disabled={operatingId === cp.id}
+                      className={`px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 border ${
+                        confirmingId === cp.id
+                          ? 'bg-rose-600 text-white border-rose-400 font-bold animate-pulse'
+                          : 'bg-[#171e2c] hover:bg-rose-950/30 text-slate-300 hover:text-rose-300 border-[#263147] hover:border-rose-500/40'
+                      }`}
+                      title={isEn ? 'Rollback project files to this checkpoint' : '回滚项目工作区到该快照'}
+                    >
+                      {operatingId === cp.id ? (
+                        <Loader2 size={12} className="animate-spin text-rose-400" />
+                      ) : (
+                        <RotateCcw size={12} className={confirmingId === cp.id ? 'text-white' : 'text-rose-400'} />
+                      )}
+                      <span>
+                        {operatingId === cp.id
+                          ? (isEn ? 'Reverting...' : '还原中...')
+                          : confirmingId === cp.id
+                          ? (isEn ? 'Confirm Revert?' : '确认回滚？')
+                          : (isEn ? 'Restore' : '时光回退')}
+                      </span>
+                    </button>
+                  </div>
                 </div>
-              );
-            })
+
+                {/* Expandable Diff Panel */}
+                {expandedDiffId === cp.id && (
+                  <div className="bg-[#090c12] border border-cyan-500/30 rounded-xl p-3 space-y-2 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-medium border-b border-[#1b2333] pb-2">
+                      <span className="flex items-center gap-1.5 text-cyan-300">
+                        <FileCode size={13} />
+                        <span>变更文件清单 (与当前工作区差异)</span>
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-500">
+                        {diffDataMap[cp.id]?.length || 0} 个文件变动
+                      </span>
+                    </div>
+
+                    {diffLoadingId === cp.id ? (
+                      <div className="py-6 flex items-center justify-center text-xs text-slate-500 gap-2">
+                        <Loader2 size={14} className="animate-spin text-cyan-400" />
+                        <span>正在计算 Git 树比对差异...</span>
+                      </div>
+                    ) : !diffDataMap[cp.id] || diffDataMap[cp.id].length === 0 ? (
+                      <div className="py-4 text-center text-xs text-slate-500">
+                        该快照与当前工作区代码内容完全一致 (无未保存变动)
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        {/* File list */}
+                        <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                          {diffDataMap[cp.id].map((f) => (
+                            <div
+                              key={f.path}
+                              onClick={() => setSelectedDiffFile(f.path)}
+                              className={`p-1.5 rounded-lg text-xs cursor-pointer flex items-center justify-between gap-1 transition ${
+                                selectedDiffFile === f.path
+                                  ? 'bg-cyan-950/60 text-cyan-200 border border-cyan-500/40'
+                                  : 'hover:bg-[#121722] text-slate-400'
+                              }`}
+                            >
+                              <span className="truncate font-mono text-[11px]">{f.path}</span>
+                              <span className="text-[10px] font-mono shrink-0">
+                                <span className="text-emerald-400">+{f.additions}</span>{' '}
+                                <span className="text-rose-400">-{f.deletions}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Patch Preview */}
+                        <div className="md:col-span-2 bg-[#05070a] border border-[#1a2233] rounded-lg p-2 max-h-48 overflow-auto font-mono text-[11px] text-slate-300 leading-relaxed whitespace-pre">
+                          {(() => {
+                            const cur = diffDataMap[cp.id].find((f) => f.path === selectedDiffFile);
+                            if (!cur || !cur.diff_preview) {
+                              return <span className="text-slate-600">点击左侧文件查看 diff 细节</span>;
+                            }
+                            return cur.diff_preview.split('\n').map((line, lIdx) => {
+                              const isAdd = line.startsWith('+') && !line.startsWith('+++');
+                              const isDel = line.startsWith('-') && !line.startsWith('---');
+                              const isHunk = line.startsWith('@@');
+                              return (
+                                <div
+                                  key={lIdx}
+                                  className={
+                                    isAdd
+                                      ? 'text-emerald-400 bg-emerald-950/20'
+                                      : isDel
+                                      ? 'text-rose-400 bg-rose-950/20'
+                                      : isHunk
+                                      ? 'text-cyan-400 font-bold'
+                                      : 'text-slate-400'
+                                  }
+                                >
+                                  {line}
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })
           )}
         </div>
 

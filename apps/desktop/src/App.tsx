@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { ShieldCheck, X } from 'lucide-react';
+import { ShieldCheck, X, Bot, CheckCircle2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
@@ -24,6 +24,7 @@ import { switchLanguage } from './i18n';
 import {
   BoardCard,
   BoardColumn,
+  DecisionRequest,
   DevosProject,
   Issue,
   ProjectType,
@@ -43,6 +44,7 @@ export const App: React.FC = () => {
   const [cards, setCards] = useState<BoardCard[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [manifest, setManifest] = useState<RunManifest | null>(null);
+  const [pendingDecisions, setPendingDecisions] = useState<DecisionRequest[]>([]);
 
   // Modals state
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
@@ -105,6 +107,57 @@ export const App: React.FC = () => {
       addToast('error', res.error.plain_message || res.error.message);
     }
     setIsEnvBusy(false);
+  };
+
+  const handleRebuildEnv = async () => {
+    if (!project || isEnvBusy) return;
+    setIsEnvBusy(true);
+    addToast('info', '正在重新构建容器镜像并重启，请稍候...');
+    const targetPath = currentProjectPathRef.current || currentProjectPath || project.slug;
+    const res = await Bridge.rebuildEnv(targetPath, 'auto');
+    if (res.ok) {
+      setIsEnvRunning(true);
+      addToast('success', '容器镜像重新构建并启动成功！');
+    } else if (res.error) {
+      addToast('error', `重新构建失败: ${res.error.plain_message || res.error.message}`);
+    }
+    setIsEnvBusy(false);
+  };
+
+  const handleOpenContainerTerminal = async () => {
+    if (!project) return;
+    const targetPath = currentProjectPathRef.current || currentProjectPath || project.slug;
+    const res = await Bridge.openContainerTerminal(targetPath, 'auto');
+    if (res.ok) {
+      addToast('success', '已在系统独立终端窗口连入容器内部环境 (Shell)');
+    } else if (res.error) {
+      addToast('error', `打开容器终端失败: ${res.error.plain_message || res.error.message}`);
+    }
+  };
+
+  const refreshPendingDecisions = async () => {
+    try {
+      const target = currentProjectPathRef.current || '.';
+      const res = await Bridge.listPendingDecisions(target);
+      if (res.ok && res.data) {
+        setPendingDecisions(res.data);
+      } else {
+        setPendingDecisions([]);
+      }
+    } catch (e) {
+      console.error('Failed to list decisions', e);
+    }
+  };
+
+  const handleResolveDecision = async (decisionId: string, optionId: string) => {
+    const target = currentProjectPathRef.current || '.';
+    const res = await Bridge.resolveUserDecision(target, decisionId, optionId);
+    if (res.ok) {
+      addToast('success', '已采纳决策方案！已同步通知 AI Agent 继续推进。');
+      refreshPendingDecisions();
+    } else {
+      addToast('error', `提交决策失败: ${res.error?.plain_message || res.error?.message}`);
+    }
   };
 
   const handleCreateSnapshotConfirm = async (name: string) => {
@@ -214,6 +267,7 @@ export const App: React.FC = () => {
       refreshIssues(projPath);
       refreshManifest(projPath);
       refreshEnvStatus(projPath);
+      refreshPendingDecisions();
       loadRecentProjects();
     }
   };
@@ -299,6 +353,7 @@ export const App: React.FC = () => {
       if (currentProjectPathRef.current && currentProjectPathRef.current !== '.') {
         refreshCards(currentProjectPathRef.current);
         refreshIssues(currentProjectPathRef.current);
+        refreshPendingDecisions();
       }
     }, 3000);
 
@@ -437,6 +492,8 @@ export const App: React.FC = () => {
         isEnvBusy={isEnvBusy}
         onToggleEnv={handleToggleEnv}
         onRestartEnv={handleRestartEnv}
+        onRebuildEnv={handleRebuildEnv}
+        onOpenContainerTerminal={handleOpenContainerTerminal}
         onTakeSnapshot={() => setIsSnapshotModalOpen(true)}
         onOpenTimeMachine={() => setIsTimeMachineOpen(true)}
         onOpenLogs={() => setIsLogModalOpen(true)}
@@ -467,11 +524,63 @@ export const App: React.FC = () => {
           isEnvRunning={isEnvRunning}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenSnapshotModal={() => setIsSnapshotModalOpen(true)}
+          onRebuildEnv={handleRebuildEnv}
+          onOpenTerminal={handleOpenContainerTerminal}
         />
 
         {/* Workspace Body */}
         {project ? (
           <>
+            {/* Human-In-The-Loop Pending Decision Notification Cards */}
+            {pendingDecisions.length > 0 && (
+              <div className="bg-amber-500/10 border-b border-amber-500/30 px-6 py-3 flex flex-col gap-2 shrink-0 animate-in fade-in duration-200">
+                {pendingDecisions.map((dec) => (
+                  <div
+                    key={dec.decision_id}
+                    className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#171a24] border border-amber-500/40 rounded-xl p-3.5 shadow-lg"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 mt-0.5 shrink-0">
+                        <Bot size={18} />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                            AI 架构决策请求 ({dec.decision_id})
+                          </span>
+                          {dec.linked_card_id && (
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              关联卡片: {dec.linked_card_id}
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-xs font-semibold text-slate-100">{dec.question_plain}</h4>
+                        {dec.context_plain && (
+                          <p className="text-[11px] text-slate-400 leading-relaxed max-w-2xl">
+                            {dec.context_plain}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      {dec.options.map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleResolveDecision(dec.decision_id, opt.id)}
+                          className="px-3 py-1.5 rounded-lg bg-[#22293a] hover:bg-emerald-500 hover:text-slate-950 text-slate-200 border border-[#2f3950] text-xs font-medium transition shadow-sm flex items-center gap-1.5 group"
+                          title={opt.tradeoff || `选择选项: ${opt.label}`}
+                        >
+                          <CheckCircle2 size={13} className="text-emerald-400 group-hover:text-slate-950" />
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {activeTab === 'board' && (
               <BoardView
                 cards={cards}
@@ -546,7 +655,9 @@ export const App: React.FC = () => {
       <CommandPaletteModal
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
+        currentProject={project}
         onNavigateTab={(tab) => setActiveTab(tab)}
+        onSelectProject={(path) => loadProjectData(path)}
         onToggleEnv={async () => {
           if (!project) return;
           const targetPath = currentProjectPathRef.current || currentProjectPath || project.slug;
@@ -554,6 +665,8 @@ export const App: React.FC = () => {
           setIsEnvRunning(false);
           addToast('info', t('toast.envStopped'));
         }}
+        onRebuildEnv={handleRebuildEnv}
+        onOpenTerminal={handleOpenContainerTerminal}
         onTakeSnapshot={() => {
           setIsSnapshotModalOpen(true);
         }}
@@ -574,6 +687,7 @@ export const App: React.FC = () => {
         onOpenAgentConnect={() => setIsAgentConnectOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenLogs={() => setIsLogModalOpen(true)}
+        onOpenTrash={() => setIsTrashViewerOpen(true)}
         isEnvRunning={true}
       />
 

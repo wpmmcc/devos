@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Cpu,
   Search,
   Camera,
+  Layers,
+  Globe,
+  Database,
+  Mail,
+  Terminal,
+  Wrench,
+  ExternalLink,
+  ChevronDown,
+  Menu,
+  X,
+  Kanban,
+  FlaskConical,
+  Bug,
+  BookOpen,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DevosProject } from '../types';
@@ -16,6 +30,8 @@ interface TopBarProps {
   isEnvRunning?: boolean;
   onOpenCommandPalette?: () => void;
   onOpenSnapshotModal?: () => void;
+  onRebuildEnv?: () => void;
+  onOpenTerminal?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -27,8 +43,26 @@ export const TopBar: React.FC<TopBarProps> = ({
   isEnvRunning = true,
   onOpenCommandPalette,
   onOpenSnapshotModal,
+  onRebuildEnv,
+  onOpenTerminal,
 }) => {
   const { t } = useTranslation();
+  const [showTopology, setShowTopology] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const topologyRef = useRef<HTMLDivElement>(null);
+
+  // Close topology popover on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (topologyRef.current && !topologyRef.current.contains(e.target as Node)) {
+        setShowTopology(false);
+      }
+    };
+    if (showTopology) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showTopology]);
 
   if (!project) {
     return (
@@ -38,10 +72,90 @@ export const TopBar: React.FC<TopBarProps> = ({
     );
   }
 
+  const primaryWebUrl = project.environments.web?.primary_url || 'http://localhost:8080';
+
   return (
-    <header className="h-[52px] bg-[#12151d] border-b border-[#1e2330] flex items-center justify-between px-3 sm:px-4 shrink-0 select-none whitespace-nowrap overflow-hidden">
+    <header className="h-[52px] bg-[#12151d] border-b border-[#1e2330] flex items-center justify-between px-3 sm:px-4 shrink-0 select-none whitespace-nowrap overflow-visible relative z-30">
       {/* Left Project Info & Mode */}
       <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink">
+        {/* Mobile Hamburger Toggle for <1024px */}
+        <div className="md:hidden relative">
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="p-1.5 rounded-lg bg-[#181c27] border border-[#232938] text-slate-300 hover:text-white"
+            title="切换视图菜单"
+          >
+            {showMobileMenu ? <X size={15} /> : <Menu size={15} />}
+          </button>
+
+          {showMobileMenu && (
+            <div className="absolute top-10 left-0 w-44 bg-[#141824] border border-[#232b3d] rounded-xl shadow-2xl p-1.5 space-y-1 z-50 animate-in fade-in duration-100">
+              <button
+                onClick={() => {
+                  onTabChange('board');
+                  setShowMobileMenu(false);
+                }}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${
+                  activeTab === 'board' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-300 hover:bg-[#1e2434]'
+                }`}
+              >
+                <Kanban size={13} />
+                <span>{t('topbar.tabBoard')}</span>
+              </button>
+              <button
+                onClick={() => {
+                  onTabChange('test');
+                  setShowMobileMenu(false);
+                }}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${
+                  activeTab === 'test' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-300 hover:bg-[#1e2434]'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <FlaskConical size={13} />
+                  <span>{t('topbar.tabTest')}</span>
+                </span>
+                {testingCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-slate-950">
+                    {testingCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  onTabChange('issues');
+                  setShowMobileMenu(false);
+                }}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${
+                  activeTab === 'issues' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-300 hover:bg-[#1e2434]'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <Bug size={13} />
+                  <span>{t('topbar.tabIssues')}</span>
+                </span>
+                {openIssuesCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-500 text-white">
+                    {openIssuesCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  onTabChange('assets');
+                  setShowMobileMenu(false);
+                }}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs ${
+                  activeTab === 'assets' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-300 hover:bg-[#1e2434]'
+                }`}
+              >
+                <BookOpen size={13} />
+                <span>{t('topbar.tabAssets')}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
         <span
           className="text-xs sm:text-sm font-semibold text-slate-100 truncate max-w-[120px] sm:max-w-[200px] xl:max-w-[280px]"
           title={`当前活跃项目: ${project.name}\n工作区模式: ${project.mode}`}
@@ -56,8 +170,8 @@ export const TopBar: React.FC<TopBarProps> = ({
         </span>
       </div>
 
-      {/* Center Nav Tabs (4 Core Views with tooltips) */}
-      <div className="flex items-center bg-[#181c27] p-1 rounded-lg border border-[#232938] shrink-0 mx-1">
+      {/* Center Nav Tabs (4 Core Views) - hidden on mobile / small split view */}
+      <div className="hidden md:flex items-center bg-[#181c27] p-1 rounded-lg border border-[#232938] shrink-0 mx-1">
         <button
           onClick={() => onTabChange('board')}
           className={`min-w-fit px-2.5 py-1 text-xs rounded-md font-medium transition ${
@@ -127,30 +241,148 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </div>
 
-      {/* Right Environment Status, Snapshot & Quick Command Palette */}
+      {/* Right Environment Status, Topology, Snapshot & Quick Command Palette */}
       <div className="flex items-center gap-2 shrink-0">
-        {/* Environment Status Badge */}
-        <div
-          className="flex items-center gap-2 px-2.5 py-1 bg-[#181c27] border border-[#232938] rounded-md text-[11px] text-slate-300"
-          title={
-            isEnvRunning
-              ? '本地容器运行正常: 端口已就绪，网络通道畅通'
-              : '本地开发容器已安全暂停'
-          }
-        >
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isEnvRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-              }`}
-            />
-            <span>{isEnvRunning ? t('topbar.webRunning') : t('topbar.webStopped')}</span>
-          </div>
-          <span className="text-slate-600 hidden sm:inline">|</span>
-          <div className="hidden sm:flex items-center gap-1 text-slate-400" title="脚本执行引擎就绪">
-            <Cpu size={12} className="text-blue-400" />
-            <span>{t('topbar.scriptReady')}</span>
-          </div>
+        {/* Environment Status Badge & Topology Launcher */}
+        <div className="relative" ref={topologyRef}>
+          <button
+            onClick={() => setShowTopology(!showTopology)}
+            className="flex items-center gap-2 px-2.5 py-1 bg-[#181c27] hover:bg-[#1e2434] border border-[#232938] rounded-md text-[11px] text-slate-300 transition"
+            title="点击展开容器集群拓扑 (Web、Database、Mailpit、Shell)"
+          >
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isEnvRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                }`}
+              />
+              <span>{isEnvRunning ? t('topbar.webRunning') : t('topbar.webStopped')}</span>
+            </div>
+            <span className="text-slate-600 hidden sm:inline">|</span>
+            <div className="hidden sm:flex items-center gap-1 text-slate-400">
+              <Layers size={12} className="text-blue-400" />
+              <span>拓扑</span>
+            </div>
+            <ChevronDown size={11} className={`text-slate-500 transition-transform ${showTopology ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Multi-Service Container Topology Card Dropdown */}
+          {showTopology && (
+            <div className="absolute right-0 top-10 w-80 bg-[#121622] border border-[#232b3d] rounded-2xl shadow-2xl p-4 space-y-3 z-50 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between border-b border-[#1d2535] pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 rounded bg-blue-500/20 text-blue-400">
+                    <Layers size={14} />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-100">容器服务集群拓扑</div>
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      {project.environments.web?.driver || 'devcontainer'} · {isEnvRunning ? '运行就绪' : '已停止'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowTopology(false)}
+                  className="text-slate-500 hover:text-slate-300 text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Service Cards */}
+              <div className="space-y-2 text-xs">
+                {/* 1. Web Service */}
+                <div className="p-2.5 bg-[#0b0e15] border border-[#1e2535] rounded-xl flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="p-1.5 rounded-lg bg-emerald-950/40 border border-emerald-800/40 text-emerald-400">
+                      <Globe size={13} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-200">Web 业务服务</div>
+                      <div className="text-[10px] text-slate-500 truncate font-mono">
+                        {primaryWebUrl}
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href={primaryWebUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg bg-[#161c28] hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400 transition"
+                    title="在浏览器中打开主站"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+
+                {/* 2. Database Service */}
+                <div className="p-2.5 bg-[#0b0e15] border border-[#1e2535] rounded-xl flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="p-1.5 rounded-lg bg-amber-950/40 border border-amber-800/40 text-amber-400">
+                      <Database size={13} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-200">数据库服务 (DB)</div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        Port 3306 / 5432 · MySQL/PostgreSQL
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-mono px-1.5 py-0.5 rounded bg-emerald-950/30 border border-emerald-800/30">
+                    Active
+                  </span>
+                </div>
+
+                {/* 3. Auxiliary Mailpit */}
+                <div className="p-2.5 bg-[#0b0e15] border border-[#1e2535] rounded-xl flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="p-1.5 rounded-lg bg-purple-950/40 border border-purple-800/40 text-purple-400">
+                      <Mail size={13} />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-200">Mailpit 邮件调试器</div>
+                      <div className="text-[10px] text-slate-500 font-mono">
+                        Port 8025 · 本地邮件拦截
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href="http://localhost:8025"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg bg-[#161c28] hover:bg-purple-500/20 text-slate-400 hover:text-purple-400 transition"
+                    title="打开 Mailpit 邮件捕获面板"
+                  >
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              </div>
+
+              {/* Quick Actions in Topology */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#1d2535]">
+                <button
+                  onClick={() => {
+                    setShowTopology(false);
+                    onOpenTerminal?.();
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#181c28] hover:bg-[#222838] text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 transition"
+                >
+                  <Terminal size={12} className="text-cyan-400" />
+                  <span>容器 Shell</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTopology(false);
+                    onRebuildEnv?.();
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg bg-[#181c28] hover:bg-[#222838] text-slate-300 text-xs font-medium flex items-center justify-center gap-1.5 transition"
+                >
+                  <Wrench size={12} className="text-emerald-400" />
+                  <span>重建容器</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Environment Snapshot Button */}
@@ -180,3 +412,4 @@ export const TopBar: React.FC<TopBarProps> = ({
     </header>
   );
 };
+

@@ -481,6 +481,17 @@ fn get_run_manifest(project_path: String) -> ApiResponse<RunManifest> {
 }
 
 #[tauri::command]
+fn save_run_manifest(project_path: String, manifest: RunManifest) -> ApiResponse<RunManifest> {
+    let res = (|| -> Result<RunManifest> {
+        let root = Path::new(&project_path);
+        let manifest_path = root.join("devos.run.json");
+        devos_core::atomic_write_json(&manifest_path, &manifest)?;
+        Ok(manifest)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
 fn execute_script_target(
     project_path: String,
     target_id: String,
@@ -654,6 +665,101 @@ async fn stop_environment(
             plain_message: Some("后台任务调度异常".to_string()),
         })
     });
+    to_api_resp(res)
+}
+
+#[tauri::command]
+async fn rebuild_environment(
+    app: AppHandle,
+    project_path: String,
+    target: String,
+) -> ApiResponse<EnvStatus> {
+    let env_locks = app.state::<ActiveEnvLocks>();
+    let locks_arc = env_locks.0.clone();
+    let res = tokio::task::spawn_blocking(move || -> Result<EnvStatus> {
+        let (root, project) = load_project_safe(&project_path)?;
+        with_env_lock(&locks_arc, &root, || {
+            let driver = get_env_driver(&target, &project.project_type);
+            driver.rebuild(&root)
+        })
+    })
+    .await
+    .unwrap_or_else(|e| {
+        Err(DevosError::Custom {
+            code: "TASK_JOIN_ERROR".to_string(),
+            message: format!("Task failed: {}", e),
+            hint: None,
+            plain_message: Some("后台任务调度异常".to_string()),
+        })
+    });
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn open_container_terminal(project_path: String, target: String) -> ApiResponse<bool> {
+    let res = (|| -> Result<bool> {
+        let (root, project) = load_project_safe(&project_path)?;
+        let driver = get_env_driver(&target, &project.project_type);
+        let cmd_parts = driver.shell_command(&root)?;
+        let full_cmd = cmd_parts.join(" ");
+
+        #[cfg(target_os = "macos")]
+        {
+            let script = format!(
+                r#"tell application "Terminal"
+                    activate
+                    do script "cd \"{}\" && {}"
+                end tell"#,
+                root.display(),
+                full_cmd
+            );
+            std::process::Command::new("osascript")
+                .args(["-e", &script])
+                .spawn()?;
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("cmd")
+                .args(["/C", "start", "powershell", "-NoExit", "-Command", &format!("cd '{}'; {}", root.display(), full_cmd)])
+                .spawn()?;
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            let _ = std::process::Command::new("x-terminal-emulator")
+                .args(["-e", &format!("sh -c 'cd \"{}\" && {}; exec sh'", root.display(), full_cmd)])
+                .spawn();
+        }
+
+        Ok(true)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn list_pending_decisions(project_path: Option<String>) -> ApiResponse<Vec<devos_schema::DecisionRequest>> {
+    let res = (|| -> Result<Vec<devos_schema::DecisionRequest>> {
+        let p_path = project_path.unwrap_or_else(|| ".".to_string());
+        let (root, project) = load_project_safe(&p_path)?;
+        let db = Database::open_global().ok();
+        devos_core::DecisionManager::list_decisions(&root, Some(&project.slug), Some("pending"), db.as_ref())
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn resolve_user_decision(
+    project_path: Option<String>,
+    decision_id: String,
+    selected_option_id: String,
+) -> ApiResponse<devos_schema::DecisionRequest> {
+    let res = (|| -> Result<devos_schema::DecisionRequest> {
+        let p_path = project_path.unwrap_or_else(|| ".".to_string());
+        let (root, _project) = load_project_safe(&p_path)?;
+        let db = Database::open_global().ok();
+        devos_core::DecisionManager::resolve_decision(&root, &decision_id, &selected_option_id, db.as_ref())
+    })();
     to_api_resp(res)
 }
 
@@ -942,6 +1048,30 @@ fn restore_vcs_checkpoint(project_path: String, checkpoint_id: String) -> ApiRes
     let res = (|| -> Result<bool> {
         let (root, _) = load_project_safe(&project_path)?;
         CheckpointManager::restore_checkpoint(&root, &checkpoint_id).map(|_| true)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn get_checkpoint_diff(
+    project_path: String,
+    checkpoint_id: String,
+) -> ApiResponse<Vec<devos_schema::FileDiffItem>> {
+    let res = (|| -> Result<Vec<devos_schema::FileDiffItem>> {
+        let (root, _) = load_project_safe(&project_path)?;
+        CheckpointManager::get_checkpoint_diff(&root, &checkpoint_id)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn search_global(
+    query: String,
+    project_slug: Option<String>,
+) -> ApiResponse<Vec<devos_schema::SearchResult>> {
+    let res = (|| -> Result<Vec<devos_schema::SearchResult>> {
+        let db = devos_core::Database::open_global()?;
+        db.global_search(&query, project_slug.as_deref())
     })();
     to_api_resp(res)
 }
@@ -1256,10 +1386,15 @@ pub fn run() {
             create_script_issue,
             retest_issue,
             get_run_manifest,
+            save_run_manifest,
             execute_script_target,
             get_env_status,
             start_environment,
             stop_environment,
+            rebuild_environment,
+            open_container_terminal,
+            list_pending_decisions,
+            resolve_user_decision,
             create_snapshot,
             restore_snapshot,
             detect_installed_agents,
@@ -1282,6 +1417,8 @@ pub fn run() {
             list_vcs_checkpoints,
             create_vcs_checkpoint,
             restore_vcs_checkpoint,
+            get_checkpoint_diff,
+            search_global,
             get_storage_report,
             clean_storage,
             trash_project,

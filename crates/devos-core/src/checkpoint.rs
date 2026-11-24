@@ -174,4 +174,72 @@ impl CheckpointManager {
             })
         }
     }
+
+    /// Compare checkpoint with current working directory to show modified files and diff preview
+    pub fn get_checkpoint_diff(
+        root: &Path,
+        checkpoint_id: &str,
+    ) -> Result<Vec<devos_schema::FileDiffItem>> {
+        let dir = Self::checkpoints_dir(root);
+        let path = dir.join(format!("{}.json", checkpoint_id));
+        if !path.exists() {
+            return Err(DevosError::Custom {
+                code: "CHECKPOINT_NOT_FOUND".to_string(),
+                message: format!("Checkpoint {} not found", checkpoint_id),
+                hint: None,
+                plain_message: Some(format!("未找到编号为 {} 的历史快照", checkpoint_id)),
+            });
+        }
+
+        let cp: Checkpoint = read_json(&path)?;
+        let commit_ref = match cp.commit_ref {
+            Some(r) => r,
+            None => return Ok(Vec::new()),
+        };
+
+        let out_numstat = Command::new("git")
+            .args(["diff", "--numstat", &commit_ref])
+            .current_dir(root)
+            .output();
+
+        let mut diff_items = Vec::new();
+        if let Ok(out) = out_numstat {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 3 {
+                    let additions = parts[0].parse::<usize>().unwrap_or(0);
+                    let deletions = parts[1].parse::<usize>().unwrap_or(0);
+                    let file_path = parts[2..].join(" ");
+
+                    let patch_out = Command::new("git")
+                        .args(["diff", "-U2", &commit_ref, "--", &file_path])
+                        .current_dir(root)
+                        .output();
+                    let preview = patch_out.ok().map(|o| {
+                        let full = String::from_utf8_lossy(&o.stdout);
+                        full.lines().take(50).collect::<Vec<_>>().join("\n")
+                    });
+
+                    let status = if additions > 0 && deletions == 0 {
+                        "added"
+                    } else if additions == 0 && deletions > 0 {
+                        "deleted"
+                    } else {
+                        "modified"
+                    };
+
+                    diff_items.push(devos_schema::FileDiffItem {
+                        path: file_path,
+                        status: status.to_string(),
+                        additions,
+                        deletions,
+                        diff_preview: preview,
+                    });
+                }
+            }
+        }
+
+        Ok(diff_items)
+    }
 }

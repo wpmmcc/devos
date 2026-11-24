@@ -18,11 +18,13 @@ import {
   X,
   Copy,
   Check,
+  Settings,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { BoardCard, DevosProject, RunManifest, ScriptContext } from '../types';
 import { devosProbe } from '../utils/probe';
 import { Bridge } from '../services/tauriBridge';
+import { RunTargetModal } from './RunTargetModal';
 
 interface TestPreviewViewProps {
   project: DevosProject;
@@ -46,6 +48,10 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
     project.project_type === 'script' ? 'script' : 'web'
   );
 
+  React.useEffect(() => {
+    setMode(project.project_type === 'script' ? 'script' : 'web');
+  }, [project.project_type, project.slug]);
+
   // Web State
   const [previewUrl, setPreviewUrl] = useState(
     project.environments.web?.primary_url || 'https://invoice-helper.ddev.site'
@@ -54,7 +60,14 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
   const [checklist, setChecklist] = useState(testingCard?.checklist || []);
 
   // Script Runner State
-  const targets = manifest?.targets || [];
+  const [localManifest, setLocalManifest] = useState<RunManifest | null>(manifest);
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
+
+  React.useEffect(() => {
+    setLocalManifest(manifest);
+  }, [manifest]);
+
+  const targets = localManifest?.targets || [];
   const [selectedTargetId, setSelectedTargetId] = useState<string>(
     targets[0]?.id || ''
   );
@@ -308,9 +321,19 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
         <div className="flex-1 flex overflow-hidden">
           {/* Left Target List */}
           <div className="w-64 bg-[#12151d] border-r border-[#1e2330] p-3 flex flex-col">
-            <span className="text-xs text-slate-400 font-medium px-2 mb-2">
-              {t('testPreview.scriptList')}
-            </span>
+            <div className="flex items-center justify-between px-2 mb-2">
+              <span className="text-xs text-slate-400 font-medium">
+                {t('testPreview.scriptList')}
+              </span>
+              <button
+                onClick={() => setIsTargetModalOpen(true)}
+                className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-medium transition"
+                title="可视化增删改目标指令"
+              >
+                <Settings size={12} />
+                <span>配置目标</span>
+              </button>
+            </div>
             <div className="space-y-1">
               {targets.map((tgt) => (
                 <button
@@ -534,6 +557,20 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Visual Run Target Editor Modal */}
+      <RunTargetModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+        projectPath={project.slug}
+        manifest={localManifest}
+        onManifestUpdated={(newM) => {
+          setLocalManifest(newM);
+          if (!selectedTargetId && newM.targets[0]) {
+            setSelectedTargetId(newM.targets[0].id);
+          }
+        }}
+      />
     </div>
   );
 };

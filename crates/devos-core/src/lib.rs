@@ -4,6 +4,7 @@ pub mod checkpoint;
 pub mod command_bus;
 pub mod daemon;
 pub mod db;
+pub mod decision;
 pub mod deploy_plugin;
 pub mod error;
 pub mod fs_utils;
@@ -24,6 +25,7 @@ pub use checkpoint::{Checkpoint, CheckpointManager};
 pub use command_bus::CommandBus;
 pub use daemon::{DaemonManager, StartupReconcileReport};
 pub use db::{ActivityEvent, Database};
+pub use decision::DecisionManager;
 pub use deploy_plugin::{
     DeployPlan, DeployPluginManager, DeployPluginMetadata, DeployProgressEvent, DeployResult,
     ValidationResult,

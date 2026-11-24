@@ -25,7 +25,7 @@ struct JsonRpcResponse {
 }
 
 fn get_project_context(arguments: &Value) -> Result<(PathBuf, DevosProject)> {
-    // 1. Check tool arguments (project_path or project_root)
+    // 1. Check tool arguments (project_path or project_root or project_slug)
     if let Some(arg_path) = arguments
         .get("project_path")
         .or_else(|| arguments.get("project_root"))
@@ -34,6 +34,25 @@ fn get_project_context(arguments: &Value) -> Result<(PathBuf, DevosProject)> {
         let p = PathBuf::from(arg_path);
         if p.exists() {
             return ProjectManager::find_and_load(p);
+        }
+    }
+
+    if let Some(slug) = arguments.get("project_slug").and_then(|v| v.as_str()) {
+        if let Ok(db) = devos_core::Database::open_global() {
+            if let Ok(recent) = db.list_recent_projects() {
+                for (p_str, name, _) in recent {
+                    let p = PathBuf::from(&p_str);
+                    if (name == slug || p.file_name().and_then(|n| n.to_str()) == Some(slug)) && p.exists() {
+                        return ProjectManager::find_and_load(p);
+                    }
+                }
+            }
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            let candidate = PathBuf::from(home).join("DevOSProjects").join(slug);
+            if candidate.exists() {
+                return ProjectManager::find_and_load(candidate);
+            }
         }
     }
 
@@ -530,17 +549,37 @@ fn execute_tool(name: &str, arguments: &Value) -> Value {
             }
 
             "request_user_decision" => {
-                let q = arguments["question_plain"].as_str().unwrap_or("");
-                let c = arguments["context_plain"].as_str().unwrap_or("");
-                let opts = arguments["options"].clone();
-                let decision_id = format!("DEC-{}", uuid::Uuid::new_v4().simple());
-                Ok(json!({
-                    "decision_id": decision_id,
-                    "status": "pending",
-                    "question": q,
-                    "context": c,
-                    "options": opts
-                }))
+                let (root, project) = get_project_context(&arguments)?;
+                let q = arguments
+                    .get("question_plain")
+                    .or_else(|| arguments.get("question"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let c = arguments
+                    .get("context_plain")
+                    .or_else(|| arguments.get("context"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let opts_val = arguments["options"].clone();
+                let opts: Vec<devos_schema::DecisionOption> = serde_json::from_value(opts_val)
+                    .map_err(|e| DevosError::Custom {
+                        code: "INVALID_OPTIONS".to_string(),
+                        message: format!("Failed to parse decision options: {}", e),
+                        hint: None,
+                        plain_message: Some("解析决策选项失败".to_string()),
+                    })?;
+                let linked_card = arguments.get("linked_card_id").and_then(|v| v.as_str());
+                let db = devos_core::Database::open_global().ok();
+                let dec = devos_core::DecisionManager::create_decision(
+                    &root,
+                    &project.slug,
+                    q,
+                    c,
+                    opts,
+                    linked_card,
+                    db.as_ref(),
+                )?;
+                Ok(serde_json::to_value(dec)?)
             }
 
             _ => Err(DevosError::Custom {

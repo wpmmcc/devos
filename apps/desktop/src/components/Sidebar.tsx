@@ -43,6 +43,8 @@ interface SidebarProps {
   isEnvBusy?: boolean;
   onToggleEnv?: () => void;
   onRestartEnv?: () => void;
+  onRebuildEnv?: () => void;
+  onOpenContainerTerminal?: () => void;
   onTakeSnapshot?: () => void;
   onOpenTimeMachine?: () => void;
   onOpenLogs?: () => void;
@@ -71,6 +73,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isEnvBusy = false,
   onToggleEnv,
   onRestartEnv,
+  onRebuildEnv,
+  onOpenContainerTerminal,
   onTakeSnapshot,
   onOpenTimeMachine,
   onOpenLogs,
@@ -360,20 +364,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </button>
 
                           {isEnvRunning && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRestartEnv?.();
-                              }}
-                              disabled={isEnvBusy}
-                              className="px-2 py-1 rounded bg-[#1e2330] hover:bg-[#282f42] text-slate-300 border border-[#2c3346] text-[11px] transition"
-                              title="重启环境: 快速重新启动当前项目的本地开发容器"
-                            >
-                              <RotateCw
-                                size={11}
-                                className={isEnvBusy ? 'animate-spin text-cyan-400' : 'text-slate-400'}
-                              />
-                            </button>
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRestartEnv?.();
+                                }}
+                                disabled={isEnvBusy}
+                                className="px-2 py-1 rounded bg-[#1e2330] hover:bg-[#282f42] text-slate-300 border border-[#2c3346] text-[11px] transition"
+                                title="重启环境: 快速重新启动当前项目的本地开发容器"
+                              >
+                                <RotateCw
+                                  size={11}
+                                  className={isEnvBusy ? 'animate-spin text-cyan-400' : 'text-slate-400'}
+                                />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRebuildEnv?.();
+                                }}
+                                disabled={isEnvBusy}
+                                className="px-2 py-1 rounded bg-[#1e2330] hover:bg-[#282f42] text-amber-300 border border-[#2c3346] text-[11px] transition"
+                                title="重新构建: 重新构建项目镜像并重启 (用于 Dockerfile 或配置修改生效)"
+                              >
+                                <RotateCcw
+                                  size={11}
+                                  className={isEnvBusy ? 'animate-spin text-cyan-400' : 'text-amber-400'}
+                                />
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenContainerTerminal?.();
+                                }}
+                                className="px-2 py-1 rounded bg-[#1e2330] hover:bg-[#282f42] text-emerald-300 border border-[#2c3346] text-[11px] transition"
+                                title="容器终端: 打开系统终端连入容器内部 (Shell/SSH)"
+                              >
+                                <Terminal size={11} className="text-emerald-400" />
+                              </button>
+                            </>
                           )}
                         </div>
 

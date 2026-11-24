@@ -206,6 +206,24 @@ enum Commands {
         #[arg(long)]
         clear: bool,
     },
+
+    /// Manage AI agent human-in-the-loop decisions
+    Decision {
+        action: String, // list, resolve
+        #[arg(long)]
+        id: Option<String>,
+        #[arg(long)]
+        option: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+    },
+
+    /// Manage network mirrors, proxy bypass, and acceleration presets
+    Mirror {
+        action: String, // list, race, set, apply
+        #[arg(long)]
+        preset: Option<String>, // auto, china_accelerated, official_direct
+    },
 }
 
 fn print_result<T: serde::Serialize>(json_mode: bool, res: Result<T>) {
@@ -399,6 +417,36 @@ async fn main() {
                         devos_core::Guardrails::check_destructive_allowed(&project, "down")?;
                         driver.down(&root)?;
                         Ok(serde_json::json!({ "status": "stopped" }))
+                    }
+                    "restart" => {
+                        let st = driver.restart(&root)?;
+                        Ok(serde_json::to_value(st)?)
+                    }
+                    "rebuild" => {
+                        let st = driver.rebuild(&root)?;
+                        Ok(serde_json::to_value(st)?)
+                    }
+                    "shell" => {
+                        let parts = driver.shell_command(&root)?;
+                        if parts.is_empty() {
+                            return Err(DevosError::Custom {
+                                code: "SHELL_UNAVAILABLE".to_string(),
+                                message: "No shell command available".to_string(),
+                                hint: None,
+                                plain_message: Some("当前驱动未提供终端命令".to_string()),
+                            });
+                        }
+                        if json_mode {
+                            Ok(serde_json::json!({ "shell_command": parts }))
+                        } else {
+                            let mut child = std::process::Command::new(&parts[0]);
+                            if parts.len() > 1 {
+                                child.args(&parts[1..]);
+                            }
+                            child.current_dir(&root);
+                            let status = child.status().map_err(DevosError::Io)?;
+                            Ok(serde_json::json!({ "exit_code": status.code().unwrap_or(0) }))
+                        }
                     }
                     "exec" => {
                         let command = if let Some(c) = cmd {
@@ -999,6 +1047,105 @@ async fn main() {
                     );
                 }
             }
+        }
+
+        Commands::Decision {
+            action,
+            id,
+            option,
+            status,
+        } => {
+            let res = (|| -> Result<serde_json::Value> {
+                let (root, project) = get_project_context(cli.project_dir)?;
+                let db = devos_core::Database::open_global().ok();
+                match action.as_str() {
+                    "list" => {
+                        let list = devos_core::DecisionManager::list_decisions(
+                            &root,
+                            Some(&project.slug),
+                            status.as_deref(),
+                            db.as_ref(),
+                        )?;
+                        Ok(serde_json::to_value(list)?)
+                    }
+                    "resolve" => {
+                        let dec_id = id.ok_or_else(|| DevosError::Custom {
+                            code: "MISSING_ARG".to_string(),
+                            message: "Missing --id argument".to_string(),
+                            hint: Some("Specify --id DEC-xxxx".to_string()),
+                            plain_message: Some("解决决策时请指定决策编号 --id".to_string()),
+                        })?;
+                        let opt_id = option.ok_or_else(|| DevosError::Custom {
+                            code: "MISSING_ARG".to_string(),
+                            message: "Missing --option argument".to_string(),
+                            hint: Some("Specify --option <option_id>".to_string()),
+                            plain_message: Some("解决决策时请指定所选选项 --option".to_string()),
+                        })?;
+                        let resolved = devos_core::DecisionManager::resolve_decision(
+                            &root,
+                            &dec_id,
+                            &opt_id,
+                            db.as_ref(),
+                        )?;
+                        Ok(serde_json::to_value(resolved)?)
+                    }
+                    _ => Err(DevosError::Custom {
+                        code: "UNKNOWN_ACTION".to_string(),
+                        message: format!("Unknown decision action: {}", action),
+                        hint: Some("Supported: list, resolve".to_string()),
+                        plain_message: Some(format!("未知的决策操作: {}", action)),
+                    }),
+                }
+            })();
+            print_result(json_mode, res);
+        }
+
+        Commands::Mirror { action, preset } => {
+            let res: Result<serde_json::Value> = async {
+                match action.as_str() {
+                    "list" => {
+                        let cfg = devos_core::MirrorManager::load_config();
+                        Ok(serde_json::to_value(cfg)?)
+                    }
+                    "race" => {
+                        let candidates = vec![
+                            "https://gh-proxy.com".to_string(),
+                            "https://mirror.ghproxy.com".to_string(),
+                            "https://registry.npmmirror.com".to_string(),
+                            "https://github.com".to_string(),
+                        ];
+                        let race_res = devos_core::MirrorManager::race_mirrors(&candidates).await;
+                        Ok(serde_json::to_value(race_res)?)
+                    }
+                    "set" => {
+                        let pr_str = preset.unwrap_or_else(|| "china_accelerated".to_string());
+                        let p = match pr_str.as_str() {
+                            "official_direct" => devos_core::MirrorPreset::OfficialDirect,
+                            _ => devos_core::MirrorPreset::ChinaAccelerated,
+                        };
+                        let mut cfg = devos_core::MirrorManager::load_config();
+                        cfg.active_preset = p;
+                        devos_core::MirrorManager::save_config(&cfg)?;
+                        Ok(serde_json::json!({ "active_preset": pr_str, "status": "updated" }))
+                    }
+                    "apply" => {
+                        let cfg = devos_core::MirrorManager::load_config();
+                        Ok(serde_json::json!({
+                            "status": "applied",
+                            "preset": cfg.active_preset,
+                            "docker_mirrors": cfg.docker_mirrors,
+                            "container_env_vars": cfg.container_env_vars
+                        }))
+                    }
+                    _ => Err(DevosError::Custom {
+                        code: "UNKNOWN_ACTION".to_string(),
+                        message: format!("Unknown mirror action: {}", action),
+                        hint: Some("Supported: list, race, set, apply".to_string()),
+                        plain_message: Some(format!("未知的镜像操作: {}", action)),
+                    }),
+                }
+            }.await;
+            print_result(json_mode, res);
         }
     }
 }

@@ -259,4 +259,38 @@ export interface TrashedProject {
   size_bytes: number;
 }
 
+export interface DecisionOption {
+  id: string;
+  label: string;
+  tradeoff?: string;
+}
+
+export interface DecisionRequest {
+  decision_id: string;
+  question_plain: string;
+  context_plain: string;
+  options: DecisionOption[];
+  selected_option_id?: string;
+  linked_card_id?: string;
+  status: 'pending' | 'resolved';
+  created_at: string;
+}
+
+export interface SearchResult {
+  category: 'card' | 'issue' | 'checkpoint' | 'project' | 'decision' | 'action';
+  id: string;
+  title: string;
+  subtitle?: string;
+  project_slug?: string;
+}
+
+export interface FileDiffItem {
+  path: string;
+  status: 'modified' | 'added' | 'deleted';
+  additions: number;
+  deletions: number;
+  diff_preview?: string;
+}
+
+
 

@@ -207,4 +207,25 @@ impl EnvDriver for DdevDriver {
             Err(_) => Ok(vec![]),
         }
     }
+
+    fn rebuild(&self, project_root: &Path) -> Result<EnvStatus> {
+        let mut cmd = Command::new("ddev");
+        cmd.args(["restart"]).current_dir(project_root);
+        inject_proxy_bypass_env(&mut cmd);
+        let output = cmd.output().map_err(DevosError::Io)?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(DevosError::EnvironmentError {
+                code: "DDEV_REBUILD_ERROR".to_string(),
+                message: stderr.to_string(),
+                hint: "Inspect DDEV logs or Docker status.".to_string(),
+                plain_message: "重新构建 Web 环境失败，请检查 Docker 服务与配置文件。".to_string(),
+            });
+        }
+        self.status(project_root)
+    }
+
+    fn shell_command(&self, _project_root: &Path) -> Result<Vec<String>> {
+        Ok(vec!["ddev".to_string(), "ssh".to_string()])
+    }
 }

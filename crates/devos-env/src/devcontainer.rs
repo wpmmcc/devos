@@ -250,4 +250,38 @@ impl EnvDriver for DevcontainerDriver {
         }
         Ok(vec![])
     }
+
+    fn rebuild(&self, project_root: &Path) -> Result<EnvStatus> {
+        self.down(project_root)?;
+        let mut cmd = get_dc_command();
+        cmd.arg("build").arg("--workspace-folder").arg(project_root);
+        inject_proxy_bypass_env(&mut cmd);
+        let _ = cmd.output();
+        self.up(project_root)
+    }
+
+    fn shell_command(&self, project_root: &Path) -> Result<Vec<String>> {
+        if let Some((_id, name, _)) = find_devcontainer(project_root) {
+            Ok(vec![
+                "docker".to_string(),
+                "exec".to_string(),
+                "-it".to_string(),
+                name,
+                "sh".to_string(),
+            ])
+        } else {
+            Ok(vec![
+                "docker".to_string(),
+                "run".to_string(),
+                "-it".to_string(),
+                "--rm".to_string(),
+                "-v".to_string(),
+                format!("{}:/workspace", project_root.display()),
+                "-w".to_string(),
+                "/workspace".to_string(),
+                "mcr.microsoft.com/devcontainers/python:3.11".to_string(),
+                "sh".to_string(),
+            ])
+        }
+    }
 }
