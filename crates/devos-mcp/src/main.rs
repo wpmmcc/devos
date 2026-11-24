@@ -24,7 +24,42 @@ struct JsonRpcResponse {
     error: Option<Value>,
 }
 
-fn get_project_context() -> Result<(PathBuf, DevosProject)> {
+fn get_project_context(arguments: &Value) -> Result<(PathBuf, DevosProject)> {
+    // 1. Check tool arguments (project_path or project_root)
+    if let Some(arg_path) = arguments
+        .get("project_path")
+        .or_else(|| arguments.get("project_root"))
+        .and_then(|v| v.as_str())
+    {
+        let p = PathBuf::from(arg_path);
+        if p.exists() {
+            return ProjectManager::find_and_load(p);
+        }
+    }
+
+    // 2. Check environment variable DEVOS_PROJECT_ROOT or DEVOS_PROJECT_PATH
+    if let Ok(env_path) = std::env::var("DEVOS_PROJECT_ROOT").or_else(|_| std::env::var("DEVOS_PROJECT_PATH")) {
+        let p = PathBuf::from(env_path);
+        if p.exists() {
+            return ProjectManager::find_and_load(p);
+        }
+    }
+
+    // 3. Check CLI arguments: --project <path> or first positional argument
+    let args: Vec<String> = std::env::args().collect();
+    for i in 1..args.len() {
+        if (args[i] == "--project" || args[i] == "--project-dir" || args[i] == "-p") && i + 1 < args.len() {
+            return ProjectManager::find_and_load(PathBuf::from(&args[i + 1]));
+        }
+        if !args[i].starts_with('-') && i == 1 {
+            let p = PathBuf::from(&args[i]);
+            if p.exists() {
+                return ProjectManager::find_and_load(p);
+            }
+        }
+    }
+
+    // 4. Default to current working directory
     let curr = std::env::current_dir().unwrap_or_default();
     ProjectManager::find_and_load(curr)
 }
@@ -193,7 +228,7 @@ fn tool_definitions() -> Value {
 
 fn execute_tool(name: &str, arguments: &Value) -> Value {
     let res: Result<Value> = (|| {
-        let (root, project) = get_project_context()?;
+        let (root, project) = get_project_context(arguments)?;
 
         // Context mismatch safeguard (GATE_CONTEXT_MISMATCH)
         if let Some(target_proj_id) = arguments.get("project_id").and_then(|v| v.as_str()) {

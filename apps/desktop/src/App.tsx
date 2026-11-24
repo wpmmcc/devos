@@ -15,6 +15,7 @@ import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { SettingsModal } from './components/SettingsModal';
 import { TimeMachineModal } from './components/TimeMachineModal';
 import { LogViewerModal } from './components/LogViewerModal';
+import { AgentConnectModal } from './components/AgentConnectModal';
 import { ToastContainer, ToastItem } from './components/ToastContainer';
 import { switchLanguage } from './i18n';
 import {
@@ -49,6 +50,7 @@ export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isAgentConnectOpen, setIsAgentConnectOpen] = useState(false);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
   // Toasts state
@@ -275,6 +277,7 @@ export const App: React.FC = () => {
         onOpenNewProject={() => setIsNewProjectOpen(true)}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onOpenConflictDoctor={() => setIsConflictDoctorOpen(true)}
+        onOpenAgentConnect={() => setIsAgentConnectOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         runningProjectsCount={project ? 1 : 0}
         onStopAllEnvironments={async () => {
@@ -407,6 +410,7 @@ export const App: React.FC = () => {
         }}
         onOpenDoctor={() => setIsDoctorOpen(true)}
         onOpenConflictDoctor={() => setIsConflictDoctorOpen(true)}
+        onOpenAgentConnect={() => setIsAgentConnectOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenLogs={() => setIsLogModalOpen(true)}
         isEnvRunning={true}
@@ -422,6 +426,12 @@ export const App: React.FC = () => {
         isOpen={isTimeMachineOpen}
         onClose={() => setIsTimeMachineOpen(false)}
         projectPath={currentProjectPath}
+      />
+
+      <AgentConnectModal
+        isOpen={isAgentConnectOpen}
+        onClose={() => setIsAgentConnectOpen(false)}
+        project={project}
       />
 
       <LogViewerModal

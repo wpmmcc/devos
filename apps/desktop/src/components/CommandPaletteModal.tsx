@@ -17,6 +17,7 @@ import {
   Terminal,
   X,
   ArrowRight,
+  Bot,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -31,6 +32,7 @@ interface CommandPaletteModalProps {
   onCleanStorage: () => void;
   onOpenDoctor: () => void;
   onOpenConflictDoctor: () => void;
+  onOpenAgentConnect?: () => void;
   onOpenSettings: () => void;
   onOpenLogs?: () => void;
   isEnvRunning: boolean;
@@ -55,6 +57,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onCleanStorage,
   onOpenDoctor,
   onOpenConflictDoctor,
+  onOpenAgentConnect,
   onOpenSettings,
   onOpenLogs,
   isEnvRunning,
@@ -137,6 +140,13 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     },
 
     // Tools
+    {
+      id: 'tool-agent-connect',
+      group: 'groupTools',
+      titleKey: 'modals.commandPalette.toolAgentConnect',
+      icon: <Bot size={15} className="text-cyan-400" />,
+      action: () => onOpenAgentConnect?.(),
+    },
     {
       id: 'tool-doctor',
       group: 'groupTools',

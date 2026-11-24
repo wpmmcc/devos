@@ -25,6 +25,7 @@ interface SidebarProps {
   onOpenNewProject: () => void;
   onOpenDoctor: () => void;
   onOpenConflictDoctor?: () => void;
+  onOpenAgentConnect?: () => void;
   onOpenSettings?: () => void;
   runningProjectsCount?: number;
   onStopAllEnvironments?: () => void;
@@ -41,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenNewProject,
   onOpenDoctor,
   onOpenConflictDoctor,
+  onOpenAgentConnect,
   onOpenSettings,
   runningProjectsCount,
   onStopAllEnvironments,
@@ -225,7 +227,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Bottom Utility Tools */}
       <div className="p-3 border-t border-[#1e2330] space-y-1">
         <button
-          onClick={() => onTabChange('assets')}
+          onClick={() => {
+            if (onOpenAgentConnect) {
+              onOpenAgentConnect();
+            } else {
+              onTabChange('assets');
+            }
+          }}
           className="w-full flex items-center justify-between px-2.5 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-[#1a1f2c] rounded-lg transition"
         >
           <span className="flex items-center gap-2">

@@ -83,6 +83,14 @@ impl AgentConfigManager {
     pub fn supported_adapters() -> &'static [AgentAdapterMeta] {
         &[
             AgentAdapterMeta {
+                id: "antigravity",
+                name: "Antigravity CLI / Gemini",
+                description: "Google Deepmind Antigravity 智能体环境与终端工作台",
+                format: ConfigFormat::StandardJson,
+                is_global_only: true,
+                manual_guide_needed: false,
+            },
+            AgentAdapterMeta {
                 id: "codebuddy",
                 name: "腾讯 CodeBuddy / WorkBuddy",
                 description: "腾讯自主研发的 AI 编程助手与智能体环境",
@@ -194,6 +202,7 @@ impl AgentConfigManager {
         let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
 
         match agent_id {
+            "antigravity" => home.join(".gemini").join("config").join("mcp_config.json"),
             "codebuddy" => home.join(".codebuddy").join(".mcp.json"),
             "trae" => {
                 if let Some(root) = project_root {
@@ -257,6 +266,7 @@ impl AgentConfigManager {
             let cfg_path = Self::resolve_config_path(meta.id, project_root);
 
             let is_installed = match meta.id {
+                "antigravity" => home.join(".gemini").exists() || cfg_path.exists(),
                 "codebuddy" => home.join(".codebuddy").exists() || cfg_path.exists(),
                 "trae" => {
                     #[cfg(target_os = "macos")]
@@ -775,6 +785,7 @@ mod tests {
     fn test_supported_adapters_matrix() {
         let adapters = AgentConfigManager::supported_adapters();
         assert!(adapters.len() >= 9);
+        assert!(adapters.iter().any(|a| a.id == "antigravity"));
         assert!(adapters.iter().any(|a| a.id == "codebuddy"));
         assert!(adapters.iter().any(|a| a.id == "trae"));
         assert!(adapters.iter().any(|a| a.id == "qoder"));
