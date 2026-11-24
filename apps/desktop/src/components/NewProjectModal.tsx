@@ -31,8 +31,14 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 select-none">
-      <div className="bg-[#141824] border border-[#222938] rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 select-none"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#141824] border border-[#222938] rounded-2xl max-w-lg w-full p-6 shadow-2xl relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-[#202636] transition"

@@ -134,11 +134,21 @@ export const App: React.FC = () => {
       await loadProjectData(initialPath);
     });
 
-    // 2. Global shortcut Cmd/Ctrl + K
+    // 2. Global shortcut Cmd/Ctrl + K & Escape to close modals
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsCommandPaletteOpen((prev) => !prev);
+      } else if (e.key === 'Escape') {
+        setIsCommandPaletteOpen(false);
+        setIsAgentConnectOpen(false);
+        setIsDoctorOpen(false);
+        setIsConflictDoctorOpen(false);
+        setIsSettingsOpen(false);
+        setIsTimeMachineOpen(false);
+        setIsLogModalOpen(false);
+        setIsNewProjectOpen(false);
+        setIsCreateIssueOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);

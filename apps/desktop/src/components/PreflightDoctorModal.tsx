@@ -110,8 +110,14 @@ export const PreflightDoctorModal: React.FC<PreflightDoctorModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-[#141824] border border-[#222938] rounded-2xl max-w-xl w-full p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden">
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#141824] border border-[#222938] rounded-2xl max-w-xl w-full p-6 shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {toast && (
           <div className="absolute top-4 right-12 z-50 bg-slate-900 border border-emerald-500/50 text-emerald-300 px-3 py-1.5 rounded-lg text-xs shadow-lg animate-in fade-in">
             {toast}

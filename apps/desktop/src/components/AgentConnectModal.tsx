@@ -163,8 +163,14 @@ export const AgentConnectModal: React.FC<AgentConnectModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="w-full max-w-4xl max-h-[90vh] bg-[#0d1017] border border-[#202738] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-4xl max-h-[90vh] bg-[#0d1017] border border-[#202738] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#202738] bg-[#121622]">
           <div className="flex items-center gap-3">

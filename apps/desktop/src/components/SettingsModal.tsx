@@ -47,8 +47,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
-      <div className="bg-[#141824] border border-[#232c3f] rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col relative">
+    <div
+      className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#141824] border border-[#232c3f] rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-4 border-b border-[#202738] flex items-center justify-between">
           <div className="flex items-center gap-2">
