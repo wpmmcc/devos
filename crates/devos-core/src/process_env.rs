@@ -93,6 +93,34 @@ pub fn diagnose_proxy_env() -> ProxyDiagnosticInfo {
     }
 }
 
+/// Check if a process with given PID is currently alive on the host
+pub fn is_process_alive(pid: u32) -> bool {
+    #[cfg(unix)]
+    {
+        // kill -0 checks for process existence without sending a signal
+        let res = Command::new("/bin/kill")
+            .args(["-0", &pid.to_string()])
+            .output();
+        match res {
+            Ok(output) => output.status.success(),
+            Err(_) => false,
+        }
+    }
+    #[cfg(windows)]
+    {
+        let res = Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/NH"])
+            .output();
+        match res {
+            Ok(output) => {
+                let out = String::from_utf8_lossy(&output.stdout);
+                out.contains(&pid.to_string())
+            }
+            Err(_) => false,
+        }
+    }
+}
+
 /// Helper to get ~/.devos/bin path
 pub fn get_devos_bin_dir() -> PathBuf {
     dirs::home_dir()

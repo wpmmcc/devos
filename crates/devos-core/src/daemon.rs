@@ -3,6 +3,13 @@ use crate::fs_utils::{atomic_write_json, read_json};
 use devos_schema::DaemonInfo;
 use std::path::PathBuf;
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct StartupReconcileReport {
+    pub stale_daemon_purged: bool,
+    pub cleaned_zombie_ports: usize,
+    pub managed_containers_active: usize,
+}
+
 pub struct DaemonManager;
 
 impl DaemonManager {
@@ -27,6 +34,66 @@ impl DaemonManager {
             let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
         }
         Ok(info)
+    }
+
+    /// Startup Reconciler:
+    /// Run lightweight startup reconciliation to detect dead locks, purge zombie PIDs,
+    /// and correct state before operations start.
+    pub fn reconcile_startup_state(
+        db: Option<&crate::db::Database>,
+    ) -> Result<StartupReconcileReport> {
+        let mut report = StartupReconcileReport {
+            stale_daemon_purged: false,
+            cleaned_zombie_ports: 0,
+            managed_containers_active: 0,
+        };
+
+        // 1. Check daemon PID liveness
+        let path = Self::get_daemon_file_path();
+        if path.exists() {
+            if let Ok(info) = read_json::<_, DaemonInfo>(&path) {
+                if !crate::process_env::is_process_alive(info.pid) {
+                    let _ = Self::remove_daemon_file();
+                    report.stale_daemon_purged = true;
+                }
+            }
+        }
+
+        // 2. Clean zombie port leases in SQLite if port is not actually bound
+        if let Some(database) = db {
+            if let Ok(ports) = crate::port::PortRegistry::list_allocated_ports(database) {
+                for p in ports {
+                    if crate::port::PortRegistry::is_port_available(p.port) {
+                        let _ = crate::port::PortRegistry::release_port(
+                            database,
+                            &p.project_id,
+                            p.port,
+                        );
+                        report.cleaned_zombie_ports += 1;
+                    }
+                }
+            }
+        }
+
+        // 3. Reconcile Docker container state with com.devos.managed=true label
+        if let Ok(output) = std::process::Command::new("docker")
+            .args([
+                "ps",
+                "--filter",
+                "label=com.devos.managed=true",
+                "--format",
+                "{{.ID}}",
+            ])
+            .output()
+        {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                report.managed_containers_active =
+                    stdout.lines().filter(|l| !l.trim().is_empty()).count();
+            }
+        }
+
+        Ok(report)
     }
 
     /// Validate incoming HTTP/IPC request headers to prevent CSRF and DNS rebinding attacks:
@@ -107,7 +174,24 @@ impl DaemonManager {
                 ),
             });
         }
-        read_json(&path)
+        let info: DaemonInfo = read_json(&path)?;
+        // Check PID liveness - auto-purge if dead
+        if !crate::process_env::is_process_alive(info.pid) {
+            let _ = Self::remove_daemon_file();
+            return Err(DevosError::Custom {
+                code: "DAEMON_NOT_RUNNING".to_string(),
+                message: format!(
+                    "Daemon process (PID {}) is dead, cleaned stale daemon.json",
+                    info.pid
+                ),
+                hint: Some("Start DevOS Desktop or run `devos daemon`.".to_string()),
+                plain_message: Some(
+                    "检测到旧 DevOS 守护进程已失效，已自动清理旧锁，降级为本地直接读写模式。"
+                        .to_string(),
+                ),
+            });
+        }
+        Ok(info)
     }
 
     pub fn remove_daemon_file() -> Result<()> {

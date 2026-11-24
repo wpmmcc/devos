@@ -22,7 +22,7 @@ pub use agent_config::{AgentConfigManager, AgentDetection};
 pub use board::BoardManager;
 pub use checkpoint::{Checkpoint, CheckpointManager};
 pub use command_bus::CommandBus;
-pub use daemon::DaemonManager;
+pub use daemon::{DaemonManager, StartupReconcileReport};
 pub use db::{ActivityEvent, Database};
 pub use deploy_plugin::{
     DeployPlan, DeployPluginManager, DeployPluginMetadata, DeployProgressEvent, DeployResult,
@@ -41,7 +41,7 @@ pub use mirror::{DownloadProgress, MirrorManager, MirrorPreset, MirrorRaceResult
 pub use port::{PortAllocation, PortOccupant, PortRegistry};
 pub use process_env::{
     configure_child_process_group, diagnose_proxy_env, get_devos_bin_dir, inject_proxy_bypass_env,
-    kill_process_tree, ProxyDiagnosticInfo, DEFAULT_NO_PROXY,
+    is_process_alive, kill_process_tree, ProxyDiagnosticInfo, DEFAULT_NO_PROXY,
 };
 pub use project::{ProjectManager, DEVOS_MANAGED_LABEL};
 pub use release::{
