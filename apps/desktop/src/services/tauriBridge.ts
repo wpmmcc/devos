@@ -224,6 +224,15 @@ export const Bridge = {
   trashProject: (projectPath: string) =>
     invokeTauri<string>('trash_project', { projectPath }),
 
+  openInFinder: (path: string) =>
+    invokeTauri<boolean>('open_in_finder', { path }),
+
+  openInTerminal: (path: string) =>
+    invokeTauri<boolean>('open_in_terminal', { path }),
+
+  openInEditor: (path: string, editor?: string) =>
+    invokeTauri<boolean>('open_in_editor', { path, editor }),
+
   listDeployPlugins: () =>
     invokeTauri<any[]>('list_deploy_plugins'),
 

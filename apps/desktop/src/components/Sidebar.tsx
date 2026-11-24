@@ -10,9 +10,13 @@ import {
   Radio,
   Trash2,
   Settings,
+  FolderOpen,
+  Terminal,
+  Code2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DevosProject, RecentProjectDto } from '../types';
+import { Bridge } from '../services/tauriBridge';
 
 interface SidebarProps {
   currentProject: DevosProject | null;
@@ -102,19 +106,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span className="text-[9px] text-slate-500 uppercase font-mono mr-1">
                       {p.project_type}
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const ok = window.confirm(t('sidebar.trashConfirm', { name: p.name }));
-                        if (ok) {
-                          alert(t('sidebar.trashSuccess', { name: p.name }));
-                        }
-                      }}
-                      className="opacity-0 group-hover:opacity-100 hover:text-rose-400 p-0.5 rounded text-slate-500 transition"
-                      title={t('sidebar.moveToTrash')}
-                    >
-                      <Trash2 size={11} />
-                    </button>
+                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          Bridge.openInFinder(p.path);
+                        }}
+                        className="p-1 hover:text-emerald-400 hover:bg-[#222838] rounded text-slate-400 transition"
+                        title={t('sidebar.openFinder')}
+                      >
+                        <FolderOpen size={11} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          Bridge.openInTerminal(p.path);
+                        }}
+                        className="p-1 hover:text-cyan-400 hover:bg-[#222838] rounded text-slate-400 transition"
+                        title={t('sidebar.openTerminal')}
+                      >
+                        <Terminal size={11} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          Bridge.openInEditor(p.path, 'cursor');
+                        }}
+                        className="p-1 hover:text-indigo-400 hover:bg-[#222838] rounded text-slate-400 transition"
+                        title={t('sidebar.openEditor')}
+                      >
+                        <Code2 size={11} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const ok = window.confirm(t('sidebar.trashConfirm', { name: p.name }));
+                          if (ok) {
+                            Bridge.trashProject(p.path).then(() => {
+                              alert(t('sidebar.trashSuccess', { name: p.name }));
+                            });
+                          }
+                        }}
+                        className="p-1 hover:text-rose-400 hover:bg-[#222838] rounded text-slate-500 transition"
+                        title={t('sidebar.moveToTrash')}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* 4 Expanded Sub-entries for Active Project */}

@@ -878,6 +878,86 @@ fn trash_project(project_path: String) -> ApiResponse<String> {
 }
 
 #[tauri::command]
+fn open_in_finder(path: String) -> ApiResponse<bool> {
+    let res = (|| -> Result<bool> {
+        let p = Path::new(&path);
+        let target = if p.exists() { p } else { Path::new(".") };
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open").arg(target).spawn();
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("explorer").arg(target).spawn();
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let _ = std::process::Command::new("xdg-open").arg(target).spawn();
+        }
+        Ok(true)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn open_in_terminal(path: String) -> ApiResponse<bool> {
+    let res = (|| -> Result<bool> {
+        let p = Path::new(&path);
+        let target = if p.exists() { p } else { Path::new(".") };
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open")
+                .args(["-a", "Terminal"])
+                .arg(target)
+                .spawn();
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("cmd")
+                .args(["/c", "start", "cmd"])
+                .current_dir(target)
+                .spawn();
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let _ = std::process::Command::new("x-terminal-emulator")
+                .current_dir(target)
+                .spawn();
+        }
+        Ok(true)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
+fn open_in_editor(path: String, editor: Option<String>) -> ApiResponse<bool> {
+    let res = (|| -> Result<bool> {
+        let p = Path::new(&path);
+        let target = if p.exists() { p } else { Path::new(".") };
+        let chosen = editor.unwrap_or_else(|| "auto".to_string());
+        let mut launched = false;
+        if chosen == "cursor" || chosen == "auto" {
+            if let Ok(_) = std::process::Command::new("cursor").arg(target).spawn() {
+                launched = true;
+            }
+        }
+        if !launched && (chosen == "code" || chosen == "auto") {
+            if let Ok(_) = std::process::Command::new("code").arg(target).spawn() {
+                launched = true;
+            }
+        }
+        if !launched {
+            #[cfg(target_os = "macos")]
+            {
+                let _ = std::process::Command::new("open").arg(target).spawn();
+            }
+        }
+        Ok(true)
+    })();
+    to_api_resp(res)
+}
+
+#[tauri::command]
 fn list_deploy_plugins() -> ApiResponse<Vec<devos_core::DeployPluginMetadata>> {
     ApiResponse::success(devos_core::DeployPluginManager::list_plugins())
 }
@@ -1005,6 +1085,9 @@ pub fn run() {
             get_storage_report,
             clean_storage,
             trash_project,
+            open_in_finder,
+            open_in_terminal,
+            open_in_editor,
             list_deploy_plugins,
             validate_deploy_target,
             plan_deployment,

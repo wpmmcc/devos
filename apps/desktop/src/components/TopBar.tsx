@@ -7,6 +7,7 @@ import {
   Cpu,
   Languages,
   RotateCcw,
+  RotateCw,
   Activity,
   Search,
   Settings,
@@ -67,6 +68,21 @@ export const TopBar: React.FC<TopBarProps> = ({
       } else if (res.error) {
         alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
       }
+    }
+    setIsBusy(false);
+  };
+
+  const handleRestartEnv = async () => {
+    if (!project || isBusy) return;
+    setIsBusy(true);
+    onShowToast?.('info', t('topbar.restartingEnv'));
+    await Bridge.stopEnv('.', 'auto');
+    const res = await Bridge.startEnv('.', 'auto');
+    if (res.ok) {
+      setIsRunning(true);
+      onShowToast?.('success', t('toast.envStarted'));
+    } else if (res.error) {
+      alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
     }
     setIsBusy(false);
   };
@@ -240,6 +256,19 @@ export const TopBar: React.FC<TopBarProps> = ({
             </>
           )}
         </button>
+
+        {/* Restart Toggle (Only visible when running) */}
+        {isRunning && (
+          <button
+            onClick={handleRestartEnv}
+            disabled={isBusy}
+            className="flex items-center gap-1 p-1.5 sm:px-2 sm:py-1.5 rounded-md text-xs font-medium bg-[#1e2330] hover:bg-[#282f42] text-slate-300 hover:text-white transition border border-[#2c3346] shrink-0"
+            title={t('topbar.restartEnv')}
+          >
+            <RotateCw size={12} className={isBusy ? 'animate-spin text-cyan-400' : 'text-slate-400'} />
+            <span className="hidden 2xl:inline">{t('topbar.restartEnv')}</span>
+          </button>
+        )}
 
         {/* Take Snapshot */}
         <button
