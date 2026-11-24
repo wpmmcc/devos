@@ -34,6 +34,8 @@ interface SidebarProps {
   testingCount: number;
   onSelectProjectByPath: (path: string) => void;
   onOpenNewProject: () => void;
+  onOpenTrashModal?: (project: RecentProjectDto) => void;
+  onOpenEditor?: (path: string) => void;
   // Project-level runtime controls:
   isEnvRunning?: boolean;
   isEnvBusy?: boolean;
@@ -60,6 +62,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   testingCount,
   onSelectProjectByPath,
   onOpenNewProject,
+  onOpenTrashModal,
+  onOpenEditor,
   isEnvRunning = true,
   isEnvBusy = false,
   onToggleEnv,
@@ -188,7 +192,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      Bridge.openInEditor(p.path, 'cursor');
+                      if (onOpenEditor) {
+                        onOpenEditor(p.path);
+                      } else {
+                        Bridge.openInEditor(p.path, 'auto');
+                      }
                     }}
                     className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#181c27] hover:bg-[#222838] hover:text-indigo-400 text-slate-400 text-[10px] transition border border-[#232938]"
                     title="在编辑器打开: 使用 Cursor 或 VS Code 打开代码"
@@ -200,11 +208,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const ok = window.confirm(t('sidebar.trashConfirm', { name: p.name }));
-                      if (ok) {
-                        Bridge.trashProject(p.path).then(() => {
-                          alert(t('sidebar.trashSuccess', { name: p.name }));
-                        });
+                      if (onOpenTrashModal) {
+                        onOpenTrashModal(p);
                       }
                     }}
                     className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#181c27] hover:bg-rose-500/20 hover:text-rose-400 text-slate-500 text-[10px] transition border border-[#232938] ml-auto"

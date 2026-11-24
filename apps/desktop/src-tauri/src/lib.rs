@@ -930,29 +930,69 @@ fn open_in_terminal(path: String) -> ApiResponse<bool> {
 }
 
 #[tauri::command]
-fn open_in_editor(path: String, editor: Option<String>) -> ApiResponse<bool> {
-    let res = (|| -> Result<bool> {
+fn open_in_editor(path: String, editor: Option<String>) -> ApiResponse<String> {
+    let res = (|| -> Result<String> {
         let p = Path::new(&path);
         let target = if p.exists() { p } else { Path::new(".") };
-        let chosen = editor.unwrap_or_else(|| "auto".to_string());
-        let mut launched = false;
+        let chosen = editor.unwrap_or_else(|| "auto".to_string()).to_lowercase();
+
+        // 1. Check Cursor
         if chosen == "cursor" || chosen == "auto" {
-            if let Ok(_) = std::process::Command::new("cursor").arg(target).spawn() {
-                launched = true;
-            }
-        }
-        if !launched && (chosen == "code" || chosen == "auto") {
-            if let Ok(_) = std::process::Command::new("code").arg(target).spawn() {
-                launched = true;
-            }
-        }
-        if !launched {
             #[cfg(target_os = "macos")]
-            {
-                let _ = std::process::Command::new("open").arg(target).spawn();
+            if std::path::Path::new("/Applications/Cursor.app").exists() {
+                if let Ok(_) = std::process::Command::new("open").args(["-a", "Cursor"]).arg(target).spawn() {
+                    return Ok("cursor".to_string());
+                }
+            }
+            if let Ok(which) = std::process::Command::new("which").arg("cursor").output() {
+                if which.status.success() {
+                    if let Ok(_) = std::process::Command::new("cursor").arg(target).spawn() {
+                        return Ok("cursor".to_string());
+                    }
+                }
             }
         }
-        Ok(true)
+
+        // 2. Check VS Code
+        if chosen == "code" || chosen == "auto" || chosen == "cursor" {
+            #[cfg(target_os = "macos")]
+            if std::path::Path::new("/Applications/Visual Studio Code.app").exists() {
+                if let Ok(_) = std::process::Command::new("open").args(["-a", "Visual Studio Code"]).arg(target).spawn() {
+                    return Ok("code".to_string());
+                }
+            }
+            if let Ok(which) = std::process::Command::new("which").arg("code").output() {
+                if which.status.success() {
+                    if let Ok(_) = std::process::Command::new("code").arg(target).spawn() {
+                        return Ok("code".to_string());
+                    }
+                }
+            }
+        }
+
+        // 3. Check Trae / Windsurf
+        #[cfg(target_os = "macos")]
+        if std::path::Path::new("/Applications/Trae.app").exists() {
+            if let Ok(_) = std::process::Command::new("open").args(["-a", "Trae"]).arg(target).spawn() {
+                return Ok("trae".to_string());
+            }
+        }
+        #[cfg(target_os = "macos")]
+        if std::path::Path::new("/Applications/Windsurf.app").exists() {
+            if let Ok(_) = std::process::Command::new("open").args(["-a", "Windsurf"]).arg(target).spawn() {
+                return Ok("windsurf".to_string());
+            }
+        }
+
+        // 4. Fallback: reveal in macOS Finder / default system handler
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open").arg(target).spawn();
+            return Ok("fallback".to_string());
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        Ok("fallback".to_string())
     })();
     to_api_resp(res)
 }

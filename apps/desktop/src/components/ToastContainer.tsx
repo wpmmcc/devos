@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, AlertCircle, Info, Copy, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, Copy, X, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export interface ToastItem {
@@ -18,6 +18,7 @@ interface ToastContainerProps {
 
 export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
   const { t } = useTranslation();
+  const [copiedId, setCopiedId] = React.useState<string | null>(null);
 
   if (toasts.length === 0) return null;
 
@@ -27,9 +28,12 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismis
         const handleCopy = () => {
           if (toast.copyText) {
             navigator.clipboard.writeText(toast.copyText);
-            alert(t('common.copied') + ':\n\n' + toast.copyText);
+            setCopiedId(toast.id);
+            setTimeout(() => setCopiedId(null), 2500);
           }
         };
+
+        const isCopied = copiedId === toast.id;
 
         return (
           <div
@@ -53,8 +57,8 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismis
                       onClick={handleCopy}
                       className="inline-flex items-center gap-1 px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold rounded text-[11px] transition shadow"
                     >
-                      <Copy size={11} />
-                      <span>{toast.actionText || t('toast.copyInstruction')}</span>
+                      {isCopied ? <Check size={11} /> : <Copy size={11} />}
+                      <span>{isCopied ? t('common.copied') : toast.actionText || t('toast.copyInstruction')}</span>
                     </button>
                   )}
                   {toast.onAction && !toast.copyText && (

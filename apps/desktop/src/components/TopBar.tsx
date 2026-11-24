@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Cpu,
   Search,
+  Camera,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DevosProject } from '../types';
@@ -14,6 +15,7 @@ interface TopBarProps {
   testingCount: number;
   isEnvRunning?: boolean;
   onOpenCommandPalette?: () => void;
+  onOpenSnapshotModal?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -24,6 +26,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   testingCount,
   isEnvRunning = true,
   onOpenCommandPalette,
+  onOpenSnapshotModal,
 }) => {
   const { t } = useTranslation();
 
@@ -124,7 +127,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         </button>
       </div>
 
-      {/* Right Minimal Environment Status & Quick Command Palette */}
+      {/* Right Environment Status, Snapshot & Quick Command Palette */}
       <div className="flex items-center gap-2 shrink-0">
         {/* Environment Status Badge */}
         <div
@@ -149,6 +152,18 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span>{t('topbar.scriptReady')}</span>
           </div>
         </div>
+
+        {/* Environment Snapshot Button */}
+        {onOpenSnapshotModal && (
+          <button
+            onClick={onOpenSnapshotModal}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-[#181c27] hover:bg-[#202636] border border-amber-500/30 text-amber-300 hover:text-amber-200 rounded-md text-xs font-medium transition shrink-0"
+            title="环境快照: 创建当前数据库与环境运行状态快照 (随时可在时光机中查看)"
+          >
+            <Camera size={13} className="text-amber-400" />
+            <span className="hidden sm:inline">{t('topbar.saveSnapshot')}</span>
+          </button>
+        )}
 
         {/* Quick Search Shortcut Cmd+K */}
         {onOpenCommandPalette && (

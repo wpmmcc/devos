@@ -79,20 +79,20 @@ export const TimeMachineModal: React.FC<TimeMachineModalProps> = ({
     }
   };
 
-  const handleRestore = async (cp: Checkpoint) => {
-    const confirmMsg = isEn
-      ? `Are you sure you want to restore to checkpoint "${cp.note}" (${cp.id})?\n\nWorking tree will be cleanly reverted without modifying your git commit history.`
-      : `确认将代码工作区恢复至快照「${cp.note}」(${cp.id})？\n\n当前未提交的工作区代码将被覆盖，快照机制不会篡改您的公开 Git 历史。`;
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
-    if (!window.confirm(confirmMsg)) {
+  const handleRestore = async (cp: Checkpoint) => {
+    if (confirmingId !== cp.id) {
+      setConfirmingId(cp.id);
       return;
     }
 
+    setConfirmingId(null);
     setOperatingId(cp.id);
     try {
       const res = await Bridge.restoreCheckpoint(projectPath, cp.id);
       if (res.ok) {
-        setStatusMessage(isEn ? `Reverted to ${cp.id} successfully!` : `已成功秒级还原至快照 ${cp.id}！`);
+        setStatusMessage(isEn ? `Reverted to ${cp.id} successfully!` : `已成功秒级还原至快照 ${cp.id}！工作区已复原`);
         await loadCheckpoints();
       } else {
         setStatusMessage(res.error?.message || (isEn ? 'Restore failed' : '时光机回滚失败'));
@@ -242,15 +242,25 @@ export const TimeMachineModal: React.FC<TimeMachineModalProps> = ({
                   <button
                     onClick={() => handleRestore(cp)}
                     disabled={operatingId === cp.id}
-                    className="px-3 py-1.5 bg-[#171e2c] hover:bg-rose-950/30 text-slate-300 hover:text-rose-300 border border-[#263147] hover:border-rose-500/40 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0"
+                    className={`px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 shrink-0 border ${
+                      confirmingId === cp.id
+                        ? 'bg-rose-600 text-white border-rose-400 font-bold animate-pulse'
+                        : 'bg-[#171e2c] hover:bg-rose-950/30 text-slate-300 hover:text-rose-300 border-[#263147] hover:border-rose-500/40'
+                    }`}
                     title={isEn ? 'Rollback project files to this checkpoint' : '回滚项目工作区到该快照'}
                   >
                     {operatingId === cp.id ? (
                       <Loader2 size={12} className="animate-spin text-rose-400" />
                     ) : (
-                      <RotateCcw size={12} className="text-rose-400" />
+                      <RotateCcw size={12} className={confirmingId === cp.id ? 'text-white' : 'text-rose-400'} />
                     )}
-                    <span>{isEn ? 'Restore' : '时光回退'}</span>
+                    <span>
+                      {operatingId === cp.id
+                        ? (isEn ? 'Reverting...' : '还原中...')
+                        : confirmingId === cp.id
+                        ? (isEn ? 'Confirm Revert?' : '确认回滚？')
+                        : (isEn ? 'Restore' : '时光回退')}
+                    </span>
                   </button>
                 </div>
               );

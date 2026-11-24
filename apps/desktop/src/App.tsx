@@ -16,6 +16,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { TimeMachineModal } from './components/TimeMachineModal';
 import { LogViewerModal } from './components/LogViewerModal';
 import { AgentConnectModal } from './components/AgentConnectModal';
+import { SnapshotModal } from './components/SnapshotModal';
+import { TrashConfirmModal } from './components/TrashConfirmModal';
 import { ToastContainer, ToastItem } from './components/ToastContainer';
 import { switchLanguage } from './i18n';
 import {
@@ -52,6 +54,9 @@ export const App: React.FC = () => {
   const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isAgentConnectOpen, setIsAgentConnectOpen] = useState(false);
+  const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
+  const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+  const [projectToTrash, setProjectToTrash] = useState<RecentProjectDto | null>(null);
   const [issueModalData, setIssueModalData] = useState<any>(null);
 
   // Environment Runtime state
@@ -67,7 +72,7 @@ export const App: React.FC = () => {
         setIsEnvRunning(false);
         addToast('info', t('toast.envStopped'));
       } else if (res.error) {
-        alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
+        addToast('error', res.error.plain_message || res.error.message);
       }
     } else {
       const res = await Bridge.startEnv('.', 'auto');
@@ -75,7 +80,7 @@ export const App: React.FC = () => {
         setIsEnvRunning(true);
         addToast('success', t('toast.envStarted'));
       } else if (res.error) {
-        alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
+        addToast('error', res.error.plain_message || res.error.message);
       }
     }
     setIsEnvBusy(false);
@@ -91,20 +96,54 @@ export const App: React.FC = () => {
       setIsEnvRunning(true);
       addToast('success', t('toast.envStarted'));
     } else if (res.error) {
-      alert(`${t('common.error')}: ${res.error.plain_message || res.error.message}`);
+      addToast('error', res.error.plain_message || res.error.message);
     }
     setIsEnvBusy(false);
   };
 
-  const handleTakeSnapshot = async () => {
+  const handleCreateSnapshotConfirm = async (name: string) => {
     if (!project) return;
-    const name = window.prompt(t('topbar.snapshotPrompt'), '');
-    if (name === null) return;
-    const res = await Bridge.createSnapshot('.', name);
+    const target = currentProjectPathRef.current || '.';
+    const res = await Bridge.createSnapshot(target, name);
     if (res.ok) {
       addToast('success', t('topbar.snapshotSuccess', { id: res.data || name }));
     } else {
-      alert(`${t('common.error')}: ${res.error?.plain_message || res.error?.message}`);
+      addToast('error', `快照保存失败: ${res.error?.plain_message || res.error?.message}`);
+    }
+  };
+
+  const handleOpenEditor = async (path: string) => {
+    const res = await Bridge.openInEditor(path, 'auto');
+    if (res.ok) {
+      const tool = res.data;
+      if (tool === 'cursor') {
+        addToast('success', '已在 Cursor 中打开项目源码');
+      } else if (tool === 'code') {
+        addToast('success', '已在 VS Code 中打开项目源码');
+      } else if (tool === 'trae' || tool === 'windsurf') {
+        addToast('success', `已在 ${tool} 中打开项目源码`);
+      } else {
+        addToast('info', '已在系统访达/默认工具中定位项目源码（提示：本机未安装 Cursor / VS Code，建议安装以获得最佳体验）');
+      }
+    } else {
+      addToast('error', `打开编辑器失败: ${res.error?.plain_message || res.error?.message}`);
+    }
+  };
+
+  const handleConfirmTrash = async (p: RecentProjectDto) => {
+    const res = await Bridge.trashProject(p.path);
+    if (res.ok) {
+      addToast('success', `项目「${p.name}」已安全移入 DevOS 回收站归档`);
+      const recents = await loadRecentProjects();
+      if (currentProjectPathRef.current === p.path) {
+        if (recents.length > 0) {
+          loadProjectData(recents[0].path);
+        } else {
+          setProject(null);
+        }
+      }
+    } else {
+      addToast('error', `移入回收站失败: ${res.error?.plain_message || res.error?.message}`);
     }
   };
 
@@ -203,6 +242,8 @@ export const App: React.FC = () => {
         setIsLogModalOpen(false);
         setIsNewProjectOpen(false);
         setIsCreateIssueOpen(false);
+        setIsSnapshotModalOpen(false);
+        setIsTrashModalOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -364,11 +405,16 @@ export const App: React.FC = () => {
         testingCount={testingCount}
         onSelectProjectByPath={(path) => loadProjectData(path)}
         onOpenNewProject={() => setIsNewProjectOpen(true)}
+        onOpenTrashModal={(p) => {
+          setProjectToTrash(p);
+          setIsTrashModalOpen(true);
+        }}
+        onOpenEditor={handleOpenEditor}
         isEnvRunning={isEnvRunning}
         isEnvBusy={isEnvBusy}
         onToggleEnv={handleToggleEnv}
         onRestartEnv={handleRestartEnv}
-        onTakeSnapshot={handleTakeSnapshot}
+        onTakeSnapshot={() => setIsSnapshotModalOpen(true)}
         onOpenTimeMachine={() => setIsTimeMachineOpen(true)}
         onOpenLogs={() => setIsLogModalOpen(true)}
         onOpenDoctor={() => setIsDoctorOpen(true)}
@@ -377,8 +423,6 @@ export const App: React.FC = () => {
         onOpenSettings={() => setIsSettingsOpen(true)}
         runningProjectsCount={isEnvRunning && project ? 1 : 0}
         onStopAllEnvironments={async () => {
-          const ok = window.confirm(t('sidebar.stopAllConfirm'));
-          if (!ok) return;
           if (project) {
             await Bridge.stopEnv('.', 'auto');
             setIsEnvRunning(false);
@@ -398,6 +442,7 @@ export const App: React.FC = () => {
           testingCount={testingCount}
           isEnvRunning={isEnvRunning}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenSnapshotModal={() => setIsSnapshotModalOpen(true)}
         />
 
         {/* Workspace Body */}
@@ -422,6 +467,7 @@ export const App: React.FC = () => {
                   setIsCreateIssueOpen(true);
                 }}
                 onRunScript={handleRunScript}
+                onOpenSnapshotModal={() => setIsSnapshotModalOpen(true)}
               />
             )}
 
@@ -483,13 +529,7 @@ export const App: React.FC = () => {
           addToast('info', t('toast.envStopped'));
         }}
         onTakeSnapshot={() => {
-          if (!project) return;
-          const name = window.prompt(t('topbar.snapshotPrompt'), '');
-          if (name) {
-            Bridge.createSnapshot('.', name).then((res) => {
-              if (res.ok) addToast('success', t('topbar.snapshotSuccess', { id: res.data || name }));
-            });
-          }
+          setIsSnapshotModalOpen(true);
         }}
         onTimeMachine={() => {
           if (!project) return;
@@ -533,6 +573,23 @@ export const App: React.FC = () => {
         isOpen={isLogModalOpen}
         onClose={() => setIsLogModalOpen(false)}
         projectPath={currentProjectPath}
+      />
+
+      <SnapshotModal
+        isOpen={isSnapshotModalOpen}
+        onClose={() => setIsSnapshotModalOpen(false)}
+        project={project}
+        onConfirm={handleCreateSnapshotConfirm}
+      />
+
+      <TrashConfirmModal
+        isOpen={isTrashModalOpen}
+        onClose={() => {
+          setIsTrashModalOpen(false);
+          setProjectToTrash(null);
+        }}
+        project={projectToTrash}
+        onConfirm={handleConfirmTrash}
       />
 
       <ToastContainer toasts={toasts} onDismiss={removeToast} />

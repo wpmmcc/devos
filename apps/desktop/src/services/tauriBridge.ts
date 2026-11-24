@@ -231,7 +231,7 @@ export const Bridge = {
     invokeTauri<boolean>('open_in_terminal', { path }),
 
   openInEditor: (path: string, editor?: string) =>
-    invokeTauri<boolean>('open_in_editor', { path, editor }),
+    invokeTauri<string>('open_in_editor', { path, editor }),
 
   listDeployPlugins: () =>
     invokeTauri<any[]>('list_deploy_plugins'),

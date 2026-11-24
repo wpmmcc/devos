@@ -30,6 +30,7 @@ interface TestPreviewViewProps {
   manifest: RunManifest | null;
   onOpenCreateIssue: (initialData?: any) => void;
   onRunScript: (targetId: string, inputs: Record<string, any>) => Promise<ScriptContext | null>;
+  onOpenSnapshotModal?: () => void;
 }
 
 export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
@@ -38,6 +39,7 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
   manifest,
   onOpenCreateIssue,
   onRunScript,
+  onOpenSnapshotModal,
 }) => {
   const { t } = useTranslation();
   const [mode, setMode] = useState<'web' | 'script'>(
@@ -91,15 +93,13 @@ export const TestPreviewView: React.FC<TestPreviewViewProps> = ({
   };
 
   const handleCreateSnapshot = async () => {
-    const name = window.prompt(t('topbar.snapshotPrompt'), '');
-    if (name === null) return;
-    setIsSnapshotting(true);
-    const res = await Bridge.createSnapshot('.', name);
-    if (res.ok) {
-      alert(t('topbar.snapshotSuccess', { id: res.data || name }));
-    } else {
-      alert(`${t('common.error')}: ${res.error?.plain_message || res.error?.message}`);
+    if (onOpenSnapshotModal) {
+      onOpenSnapshotModal();
+      return;
     }
+    const defaultName = `snapshot_${Date.now()}`;
+    setIsSnapshotting(true);
+    await Bridge.createSnapshot('.', defaultName);
     setIsSnapshotting(false);
   };
 
