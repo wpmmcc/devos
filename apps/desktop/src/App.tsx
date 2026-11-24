@@ -84,7 +84,9 @@ export const App: React.FC = () => {
     const res = await Bridge.getRecentProjects();
     if (res.ok && res.data) {
       setRecentProjects(res.data);
+      return res.data;
     }
+    return [];
   };
 
   const loadProjectData = async (projPath: string) => {
@@ -122,8 +124,16 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     // 1. Initial load
-    loadRecentProjects().then(() => {
-      loadProjectData('.');
+    loadRecentProjects().then(async (recents) => {
+      const res = await Bridge.loadProject('.');
+      if (res.ok && res.data) {
+        setProject(res.data);
+        refreshCards('.');
+        refreshIssues('.');
+        refreshManifest('.');
+      } else if (recents && recents.length > 0) {
+        loadProjectData(recents[0].path);
+      }
     });
 
     // 2. Global shortcut Cmd/Ctrl + K

@@ -56,7 +56,37 @@ fn auto_fix_environment() -> ApiResponse<Vec<DiagnosticItem>> {
 fn get_recent_projects() -> ApiResponse<Vec<RecentProjectDto>> {
     let res = (|| -> Result<Vec<RecentProjectDto>> {
         let db = Database::open_global()?;
-        let list = db.list_recent_projects()?;
+        let mut list = db.list_recent_projects()?;
+
+        // Auto-discover projects in ~/DevOSProjects if list is empty
+        if list.is_empty() {
+            if let Some(home) = dirs::home_dir() {
+                let projects_dir = home.join("DevOSProjects");
+                if projects_dir.is_dir() {
+                    if let Ok(entries) = std::fs::read_dir(&projects_dir) {
+                        for entry in entries.flatten() {
+                            let sub = entry.path();
+                            if sub.join("devos.json").exists() {
+                                if let Ok((_, p)) = ProjectManager::find_and_load(&sub) {
+                                    let p_type = match p.project_type {
+                                        ProjectType::Web => "web",
+                                        ProjectType::Script => "script",
+                                        ProjectType::Hybrid => "hybrid",
+                                    };
+                                    let _ = db.add_recent_project(
+                                        &sub.display().to_string(),
+                                        &p.name,
+                                        p_type,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    list = db.list_recent_projects()?;
+                }
+            }
+        }
+
         Ok(list
             .into_iter()
             .map(|(path, name, project_type)| RecentProjectDto {
